@@ -6,6 +6,9 @@ import java.util.ArrayList;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
 
 import activitystreamer.util.Settings;
 
@@ -14,12 +17,16 @@ public class Control extends Thread {
 	private static ArrayList<Connection> connections;
 	private static boolean term=false;
 	private static Listener listener;
+	private static ArrayList<String> usernameList;
+	private static ArrayList<String> secretList;
+	private JSONParser parser = new JSONParser();
 	
 	protected static Control control = null;
 	
 	public static Control getInstance() {
 		if(control==null){
 			control=new Control();
+			
 		} 
 		return control;
 	}
@@ -27,6 +34,8 @@ public class Control extends Thread {
 	public Control() {
 		// initialize the connections array
 		connections = new ArrayList<Connection>();
+		usernameList = new ArrayList<String>();
+		secretList = new ArrayList<String>();
 		// start a listener
 		try {
 			listener = new Listener();
@@ -53,8 +62,99 @@ public class Control extends Thread {
 	 * Return true if the connection should close.
 	 */
 	public synchronized boolean process(Connection con,String msg){
-		return true;
+		//zhenyuan
+		try {
+			JSONObject incomingObj = (JSONObject) this.parser.parse(msg);
+			JSONObject outgoingObj = cmdReader(incomingObj);
+			con.writeMsg(outgoingObj.toJSONString());
+			log.info("server data sent!");
+		} catch (ParseException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		//zhenyuan
+		return false;
 	}
+	
+	//zhenyuan
+	@SuppressWarnings("unchecked")
+	public static JSONObject cmdReader(JSONObject incomingObj) {
+		JSONObject outgoingObj;
+		String cmd = (String) incomingObj.get("command");
+		switch(cmd){
+			case "LOGIN":
+				outgoingObj = login(incomingObj);
+				break;
+			case "REGISTER":
+				outgoingObj = register(incomingObj);
+				break;
+			default:
+				outgoingObj = new JSONObject();
+				outgoingObj.put( "command", "INVALID_MESSAGE");
+				outgoingObj.put( "info", "the received message did not contain a command");
+				
+		}
+		return outgoingObj;
+	}
+	//zhenyuan
+	
+	//zhenyuan
+	@SuppressWarnings("unchecked")
+	public static JSONObject login(JSONObject incomingObj) {
+		JSONObject outgoingObj = new JSONObject();
+		boolean successLogin = false;
+		String username = (String) incomingObj.get("username");
+		String secret = (String) incomingObj.get("secret");
+		
+		if(username.equals("anonymous")) {
+			successLogin = true;
+		}else if(usernameList.contains(username) && secretList.contains(secret)) {
+			if(usernameList.indexOf(username) == secretList.indexOf(secret)) {
+				successLogin = true;
+			}
+		}
+		
+		if(successLogin) {
+			log.info("LOGIN SUCCESS!");
+			outgoingObj.put("command", "LOGIN_SUCCESS");
+			outgoingObj.put("info", "logged in as user "+username);
+		}
+		else {
+			outgoingObj.put("command", "LOGIN_FAILED");
+			outgoingObj.put("info", "LOGIN_FAILED");	
+		}
+		
+		return outgoingObj;
+	}
+	//zhenyuan
+	
+	//zhenyuan
+	@SuppressWarnings("unchecked")
+	public static JSONObject register(JSONObject incomingObj) {
+		JSONObject outgoingObj = new JSONObject();
+		boolean successRegister = false;
+		String username = (String) incomingObj.get("username");
+		String secret = (String) incomingObj.get("secret");
+		
+		//TODO verify if successRegister
+		//assume successfully Register
+		successRegister = true;
+		
+		if(successRegister) {
+			log.info("REGISTER SUCCESS!");
+			usernameList.add(username);
+			secretList.add(secret);
+			outgoingObj.put("command", "REGISTER_SUCCESS");
+			outgoingObj.put("info", "register success for "+username);
+		}else {
+			outgoingObj.put("command", "REGISTER_FAILED");
+			outgoingObj.put("info", username+" is already registered with the system");
+		}
+		
+		return outgoingObj;
+	}
+	//zhenyuan
+	
 	
 	/*
 	 * The connection has been closed by the other party.

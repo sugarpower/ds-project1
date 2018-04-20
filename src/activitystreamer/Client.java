@@ -1,4 +1,4 @@
-package activitystreamer;
+package activitystreamer;  //{"command":"REGISTER", "username":"max","secret":"123"}
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
