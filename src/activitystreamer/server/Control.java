@@ -20,6 +20,7 @@ public class Control extends Thread {
 	private static ArrayList<String> usernameList;
 	private static ArrayList<String> secretList;
 	private static ArrayList<String> loginList;
+	private static String serverSecret = "123";
 	private static int load;
 	private JSONParser parser = new JSONParser();
 	
@@ -100,6 +101,13 @@ public class Control extends Thread {
 					control.connectionClosed(con);  //remove connection
 					term=true;         //disconnect
 					load--;
+					break;
+				case "AUTHENTICATE":
+					if(authenticateFail(incomingObj)) {
+						outgoingObj = authenticateReply(incomingObj);
+						con.writeMsg(outgoingObj.toJSONString());
+					}
+
 					break;
 				case "ACTIVITY_MESSAGE":
 					outgoingObj = activityMessage(incomingObj);
@@ -206,6 +214,21 @@ public class Control extends Thread {
 		outgoingObj.put( "command" , "LOCK_REQUEST");
 		outgoingObj.put("username", username);
 		outgoingObj.put("secret", secret);
+		return outgoingObj;
+	}
+	
+	@SuppressWarnings("unchecked")
+	public static boolean authenticateFail(JSONObject incomingObj) {
+		String secret = (String) incomingObj.get("secret");
+		return !secret.equals(serverSecret);
+	}
+	
+	@SuppressWarnings("unchecked")
+	public static JSONObject authenticateReply(JSONObject incomingObj) {
+		JSONObject outgoingObj = new JSONObject();
+		String secret = (String) incomingObj.get("secret");
+		outgoingObj.put( "command" , "AUTHENTICATION_FAIL");
+		outgoingObj.put(  "info" , "the supplied secret is incorrect: "+secret);
 		return outgoingObj;
 	}
 	
