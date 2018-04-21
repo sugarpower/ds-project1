@@ -42,13 +42,13 @@ public class ClientSkeleton extends Thread {
 	public ClientSkeleton(){
 		
 		//Zhenyuan
-			try {
+			try { if (term==false) {             //xueyang
 				socket = new Socket(Settings.getRemoteHostname(),Settings.getRemotePort());
 				in = new DataInputStream(socket.getInputStream());
 			    out = new DataOutputStream(socket.getOutputStream());
 			    inreader = new BufferedReader(new InputStreamReader(in));
 			    outwriter = new PrintWriter(out, true);
-				
+			}
 			} catch (UnknownHostException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -70,11 +70,9 @@ public class ClientSkeleton extends Thread {
 	@SuppressWarnings("unchecked")
 	public void sendActivityObject(JSONObject activityObj){
 		//Zhenyuan
-		
-		outwriter.println(activityObj.toString());
-		outwriter.flush();
-		
-		
+		if (!activityObj.containsValue("LOGOUT")) {
+			outwriter.println(activityObj.toString());
+			outwriter.flush(); 
 		try {
 			JSONObject incomingObj;
 			incomingObj = (JSONObject) parser.parse(inreader.readLine());
@@ -86,15 +84,29 @@ public class ClientSkeleton extends Thread {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+		}else{
+			outwriter.println(activityObj.toString());		//Xueyang
+			outwriter.flush();  							//Xueyang
+			ClientSkeleton.getInstance().disconnect();      //Xueyang
+		}
 		
 		//Zhenyuan
 	}
 	
-	
+	//Xueyang
 	public void disconnect(){
-
+		if(term==false){
+			log.info("closing connection "+Settings.socketAddress(socket));
+			try {
+				term=true;
+				outwriter.close();
+				inreader.close();
+			} catch (IOException e) {
+				log.error("received exception closing the connection "+Settings.socketAddress(socket)+": "+e);
+			}
+		}
 	}
-	
+	//Xueyang
 	
 	public void run(){
 		

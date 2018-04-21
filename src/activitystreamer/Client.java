@@ -1,5 +1,6 @@
 package activitystreamer;  //{"command":"REGISTER", "username":"max","secret":"123"}
-
+							// {"command":"LOGIN", "username":"max","secret":"123"}
+							//{"command":"LOGOUT"}
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;

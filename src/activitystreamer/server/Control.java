@@ -65,9 +65,7 @@ public class Control extends Thread {
 		//zhenyuan
 		try {
 			JSONObject incomingObj = (JSONObject) this.parser.parse(msg);
-			JSONObject outgoingObj = cmdReader(incomingObj);
-			con.writeMsg(outgoingObj.toJSONString());
-			log.info("server data sent!");
+			cmdOperator(con,incomingObj);          //xueyang
 		} catch (Exception e) {
 			log.error("invalid JSON object");
 		}
@@ -77,7 +75,7 @@ public class Control extends Thread {
 	
 	//zhenyuan&xueyang
 	@SuppressWarnings("unchecked")
-	public static JSONObject cmdReader(JSONObject incomingObj) {
+	public static void cmdOperator(Connection con,JSONObject incomingObj) {
 		JSONObject outgoingObj=null;
 		
 		if(incomingObj.containsKey("command")) {
@@ -85,23 +83,29 @@ public class Control extends Thread {
 			switch(cmd){
 				case "LOGIN":
 					outgoingObj = login(incomingObj);
+					con.writeMsg(outgoingObj.toJSONString());
 					break;
 				case "REGISTER":
 					outgoingObj = register(incomingObj);
+					con.writeMsg(outgoingObj.toJSONString());
+					break;
+				case "LOGOUT" :
+					control.connectionClosed(con);  //remove connection
+					term=true;         //disconnect
 					break;
 				default:
 					outgoingObj = new JSONObject();
 					outgoingObj.put( "command", "INVALID_MESSAGE");
 					outgoingObj.put( "info", "the received message did not contain a command");
-					return outgoingObj;
+					con.writeMsg(outgoingObj.toJSONString());
 		}
 		} else {
 			outgoingObj = new JSONObject();
 			outgoingObj.put( "command", "INVALID_MESSAGE");
 			outgoingObj.put( "info","JSON parse error while parsing message");
-			return outgoingObj;
+			con.writeMsg(outgoingObj.toJSONString());
+			
 		}
-		return outgoingObj;
 		}
 		
 	
@@ -130,7 +134,7 @@ public class Control extends Thread {
 		}
 		else {
 			outgoingObj.put("command", "LOGIN_FAILED");
-			outgoingObj.put("info", "LOGIN_FAILED");	
+			outgoingObj.put("info", "attempt to login with wrong secret");	
 		}
 		
 		return outgoingObj;
@@ -164,7 +168,7 @@ public class Control extends Thread {
 	}
 	//zhenyuan
 	
-	
+
 	/*
 	 * The connection has been closed by the other party.
 	 */
