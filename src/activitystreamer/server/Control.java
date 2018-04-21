@@ -68,35 +68,44 @@ public class Control extends Thread {
 			JSONObject outgoingObj = cmdReader(incomingObj);
 			con.writeMsg(outgoingObj.toJSONString());
 			log.info("server data sent!");
-		} catch (ParseException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+		} catch (Exception e) {
+			log.error("invalid JSON object");
 		}
 		//zhenyuan
 		return false;
 	}
 	
-	//zhenyuan
+	//zhenyuan&xueyang
 	@SuppressWarnings("unchecked")
 	public static JSONObject cmdReader(JSONObject incomingObj) {
-		JSONObject outgoingObj;
-		String cmd = (String) incomingObj.get("command");
-		switch(cmd){
-			case "LOGIN":
-				outgoingObj = login(incomingObj);
-				break;
-			case "REGISTER":
-				outgoingObj = register(incomingObj);
-				break;
-			default:
-				outgoingObj = new JSONObject();
-				outgoingObj.put( "command", "INVALID_MESSAGE");
-				outgoingObj.put( "info", "the received message did not contain a command");
-				
+		JSONObject outgoingObj=null;
+		
+		if(incomingObj.containsKey("command")) {
+			String cmd = (String) incomingObj.get("command");
+			switch(cmd){
+				case "LOGIN":
+					outgoingObj = login(incomingObj);
+					break;
+				case "REGISTER":
+					outgoingObj = register(incomingObj);
+					break;
+				default:
+					outgoingObj = new JSONObject();
+					outgoingObj.put( "command", "INVALID_MESSAGE");
+					outgoingObj.put( "info", "the received message did not contain a command");
+					return outgoingObj;
+		}
+		} else {
+			outgoingObj = new JSONObject();
+			outgoingObj.put( "command", "INVALID_MESSAGE");
+			outgoingObj.put( "info","JSON parse error while parsing message");
+			return outgoingObj;
 		}
 		return outgoingObj;
-	}
-	//zhenyuan
+		}
+		
+	
+	//zhenyuan&xueyang
 	
 	//zhenyuan
 	@SuppressWarnings("unchecked")
