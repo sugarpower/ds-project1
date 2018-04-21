@@ -19,6 +19,8 @@ public class Control extends Thread {
 	private static Listener listener;
 	private static ArrayList<String> usernameList;
 	private static ArrayList<String> secretList;
+	private static ArrayList<String> loginList;
+	private static int load;
 	private JSONParser parser = new JSONParser();
 	
 	protected static Control control = null;
@@ -36,6 +38,8 @@ public class Control extends Thread {
 		connections = new ArrayList<Connection>();
 		usernameList = new ArrayList<String>();
 		secretList = new ArrayList<String>();
+		loginList = new ArrayList<String>();
+		load = 0;
 		// start a listener
 		try {
 			listener = new Listener();
@@ -76,7 +80,8 @@ public class Control extends Thread {
 	//zhenyuan&xueyang
 	@SuppressWarnings("unchecked")
 	public static void cmdOperator(Connection con,JSONObject incomingObj) {
-		JSONObject outgoingObj=null;
+		JSONObject outgoingObj = null;
+		
 		
 		if(incomingObj.containsKey("command")) {
 			String cmd = (String) incomingObj.get("command");
@@ -84,17 +89,35 @@ public class Control extends Thread {
 				case "LOGIN":
 					outgoingObj = login(incomingObj);
 					con.writeMsg(outgoingObj.toJSONString());
+					load++;
 					break;
 				case "REGISTER":
 					outgoingObj = register(incomingObj);
 					con.writeMsg(outgoingObj.toJSONString());
 					break;
 				case "LOGOUT" :
+					//TODO remove it from loginList
 					control.connectionClosed(con);  //remove connection
 					term=true;         //disconnect
+					load--;
 					break;
 				case "ACTIVITY_MESSAGE":
 					outgoingObj = activityMessage(incomingObj);
+					for(int i=0;i< connections.size();i++) {
+						if (i != connections.indexOf(con)) {
+						connections.get(i).writeMsg(outgoingObj.toJSONString());
+						}
+					}
+					break;
+				case "ACTIVITY_BROADCAST":
+					outgoingObj = incomingObj;
+					for(int i=0;i< connections.size();i++) {
+						if (i != connections.indexOf(con)) {
+						connections.get(i).writeMsg(outgoingObj.toJSONString());
+						}
+					}
+				case "LOCK_REQUEST":
+					outgoingObj = lockReply(incomingObj);
 					con.writeMsg(outgoingObj.toJSONString());
 					break;
 				default:
@@ -129,6 +152,7 @@ public class Control extends Thread {
 		}else if(usernameList.contains(username) && secretList.contains(secret)) {
 			if(usernameList.indexOf(username) == secretList.indexOf(secret)) {
 				successLogin = true;
+				loginList.add(username);
 			}
 		}
 		
@@ -145,6 +169,7 @@ public class Control extends Thread {
 		return outgoingObj;
 	}
 	//zhenyuan
+	
 	
 	//zhenyuan
 	@SuppressWarnings("unchecked")
@@ -174,6 +199,17 @@ public class Control extends Thread {
 	//zhenyuan
 	
 	@SuppressWarnings("unchecked")
+	public static JSONObject lockRequest(JSONObject incomingObj) {
+		JSONObject outgoingObj = new JSONObject();
+		String username = (String) incomingObj.get("username");
+		String secret = (String) incomingObj.get("secret");
+		outgoingObj.put( "command" , "LOCK_REQUEST");
+		outgoingObj.put("username", username);
+		outgoingObj.put("secret", secret);
+		return outgoingObj;
+	}
+	
+	@SuppressWarnings("unchecked")
 	public static JSONObject activityMessage(JSONObject incomingObj) {
 		JSONObject outgoingObj = new JSONObject();
 		boolean successLogin = false;
@@ -196,6 +232,25 @@ public class Control extends Thread {
 		return outgoingObj;
 	}
 
+	@SuppressWarnings("unchecked")
+	public static JSONObject lockReply(JSONObject incomingObj) {
+		JSONObject outgoingObj = new JSONObject();
+		String username = (String) incomingObj.get("username");
+		String secret = (String) incomingObj.get("secret");
+		
+		if(usernameList.contains(username)){
+			outgoingObj.put("command", "LOCK_DENIED");
+		}else {
+			outgoingObj.put("command", "ALLOWED");
+			usernameList.add(username);
+			secretList.add(secret);
+		}
+		outgoingObj.put("username", username);
+		outgoingObj.put("secret", secret);
+		return outgoingObj;
+	}
+	
+	
 	/*
 	 * The connection has been closed by the other party.
 	 */
