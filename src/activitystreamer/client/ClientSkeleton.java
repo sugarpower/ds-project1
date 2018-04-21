@@ -42,7 +42,8 @@ public class ClientSkeleton extends Thread {
 	public ClientSkeleton(){
 		
 		//Zhenyuan
-			try { if (term==false) {             //xueyang
+			try { 
+				if (!term) {             //xueyang
 				socket = new Socket(Settings.getRemoteHostname(),Settings.getRemotePort());
 				in = new DataInputStream(socket.getInputStream());
 			    out = new DataOutputStream(socket.getOutputStream());
@@ -87,6 +88,7 @@ public class ClientSkeleton extends Thread {
 				term=true;
 				outwriter.close();
 				inreader.close();
+				socket.close();
 			} catch (IOException e) {
 				log.error("received exception closing the connection "+Settings.socketAddress(socket)+": "+e);
 			}
