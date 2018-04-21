@@ -70,24 +70,10 @@ public class ClientSkeleton extends Thread {
 	@SuppressWarnings("unchecked")
 	public void sendActivityObject(JSONObject activityObj){
 		//Zhenyuan
-		if (!activityObj.containsValue("LOGOUT")) {
-			outwriter.println(activityObj.toString());
-			outwriter.flush(); 
-		try {
-			JSONObject incomingObj;
-			incomingObj = (JSONObject) parser.parse(inreader.readLine());
-			this.textFrame.setOutputText(incomingObj);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (ParseException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		}else{
-			outwriter.println(activityObj.toString());		//Xueyang
-			outwriter.flush();  							//Xueyang
-			ClientSkeleton.getInstance().disconnect();      //Xueyang
+		outwriter.println(activityObj.toString());
+		outwriter.flush(); 
+		if (activityObj.containsValue("LOGOUT")) {
+			ClientSkeleton.getInstance().disconnect();		//Xueyang
 		}
 		
 		//Zhenyuan
@@ -109,6 +95,18 @@ public class ClientSkeleton extends Thread {
 	//Xueyang
 	
 	public void run(){
+		try {
+			JSONObject incomingObj;
+			incomingObj = (JSONObject) parser.parse(inreader.readLine());
+			this.textFrame.setOutputText(incomingObj);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (ParseException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
 		
 	}
 	
