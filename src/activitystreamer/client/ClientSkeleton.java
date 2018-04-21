@@ -81,7 +81,7 @@ public class ClientSkeleton extends Thread {
 	
 	//Xueyang
 	public void disconnect(){
-		if(term==false){
+		if(!term){
 			log.info("closing connection "+Settings.socketAddress(socket));
 			try {
 				term=true;
@@ -95,10 +95,19 @@ public class ClientSkeleton extends Thread {
 	//Xueyang
 	
 	public void run(){
+		while(!term) {
+		JSONObject incomingObj;
 		try {
-			JSONObject incomingObj;
 			incomingObj = (JSONObject) parser.parse(inreader.readLine());
 			this.textFrame.setOutputText(incomingObj);
+			String command = (String) incomingObj.get("command");
+			
+			if(command.equals("INVALID_MESSAGE")) {
+				this.disconnect();
+			}
+			
+			
+			
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -107,7 +116,7 @@ public class ClientSkeleton extends Thread {
 			e.printStackTrace();
 		}
 		
-		
+		}
 	}
 	
 }
