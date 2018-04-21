@@ -100,13 +100,13 @@ public class Control extends Thread {
 				default:
 					outgoingObj = new JSONObject();
 					outgoingObj.put( "command", "INVALID_MESSAGE");
-					outgoingObj.put( "info", "the received message did not contain a command");
+					outgoingObj.put( "info", "JSON parse error while parsing message");
 					con.writeMsg(outgoingObj.toJSONString());
 		}
 		} else {
 			outgoingObj = new JSONObject();
 			outgoingObj.put( "command", "INVALID_MESSAGE");
-			outgoingObj.put( "info","JSON parse error while parsing message");
+			outgoingObj.put( "info","the received message did not contain a command");
 			con.writeMsg(outgoingObj.toJSONString());
 			
 		}
