@@ -93,6 +93,10 @@ public class Control extends Thread {
 					control.connectionClosed(con);  //remove connection
 					term=true;         //disconnect
 					break;
+				case "ACTIVITY_MESSAGE":
+					outgoingObj = activityMessage(incomingObj);
+					con.writeMsg(outgoingObj.toJSONString());
+					break;
 				default:
 					outgoingObj = new JSONObject();
 					outgoingObj.put( "command", "INVALID_MESSAGE");
@@ -106,6 +110,7 @@ public class Control extends Thread {
 			con.writeMsg(outgoingObj.toJSONString());
 			
 		}
+		
 		}
 		
 	
@@ -168,6 +173,28 @@ public class Control extends Thread {
 	}
 	//zhenyuan
 	
+	@SuppressWarnings("unchecked")
+	public static JSONObject activityMessage(JSONObject incomingObj) {
+		JSONObject outgoingObj = new JSONObject();
+		boolean successLogin = false;
+		String username = (String) incomingObj.get("username");
+		String secret = (String) incomingObj.get("secret");
+		String activity = (String) incomingObj.get("activity");
+		
+		if(username.equals("anonymous")) {
+			successLogin = true;
+		}else if(usernameList.contains(username) && secretList.contains(secret)) {
+			if(usernameList.indexOf(username) == secretList.indexOf(secret)) {
+				successLogin = true;
+			}
+		}
+		
+		if(successLogin) {
+			outgoingObj.put("command", "ACTIVITY_BROADCAST");
+			outgoingObj.put("activity", activity);
+		}
+		return outgoingObj;
+	}
 
 	/*
 	 * The connection has been closed by the other party.
