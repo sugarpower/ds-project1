@@ -21,7 +21,7 @@ public class Control extends Thread {
 	private static ArrayList<String> secretList;
 	private static ArrayList<String> loginList;
 	private static String serverSecret = "123";
-	private static int load;
+	private static int load = 0 ;
 	private JSONParser parser = new JSONParser();
 	
 	protected static Control control = null;
