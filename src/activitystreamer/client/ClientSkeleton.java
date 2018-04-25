@@ -121,9 +121,7 @@ public class ClientSkeleton extends Thread {
 			
 			if(command.equals("INVALID_MESSAGE")) {
 				this.disconnect();
-			}
-			
-			
+			}		
 			
 		} catch (IOException e) {
 			// TODO Auto-generated catch block

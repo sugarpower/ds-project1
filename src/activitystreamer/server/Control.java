@@ -20,7 +20,10 @@ public class Control extends Thread {
 	private static ArrayList<String> usernameList;
 	private static ArrayList<String> secretList;
 	private static ArrayList<String> loginList;
-	private static String serverSecret = "123";
+	private static String serverSecret = Settings.getSecret();
+	private static String id = Settings.nextSecret();
+	private static String localhost = Settings.getLocalHostname();
+	private static int localport = Settings.getLocalPort();
 	private static int load = 0 ;
 	private JSONParser parser = new JSONParser();
 	
@@ -28,8 +31,7 @@ public class Control extends Thread {
 	
 	public static Control getInstance() {
 		if(control==null){
-			control=new Control();
-			
+			control=new Control();	
 		} 
 		return control;
 	}
@@ -55,6 +57,14 @@ public class Control extends Thread {
 		if(Settings.getRemoteHostname()!=null){
 			try {
 				outgoingConnection(new Socket(Settings.getRemoteHostname(),Settings.getRemotePort()));
+				
+				//zhenyuan
+				JSONObject outgoingObj = new JSONObject();
+				outgoingObj.put("command", "AUTHENTICATE");
+				outgoingObj.put("secret", serverSecret);
+				connections.get(0).writeMsg(outgoingObj.toJSONString());
+				//zhenyuan
+				
 			} catch (IOException e) {
 				log.error("failed to make connection to "+Settings.getRemoteHostname()+":"+Settings.getRemotePort()+" :"+e);
 				System.exit(-1);
@@ -99,15 +109,21 @@ public class Control extends Thread {
 				case "LOGOUT" :
 					//TODO remove it from loginList
 					control.connectionClosed(con);  //remove connection
-					term=true;         //disconnect
+					term=true;         //disconnect //see if it works
 					load--;
 					break;
 				case "AUTHENTICATE":
 					if(authenticateFail(incomingObj)) {
 						outgoingObj = authenticateReply(incomingObj);
 						con.writeMsg(outgoingObj.toJSONString());
+						control.connectionClosed(con);  //remove connection
+					}else {
+						con.setAuthenticatedServer(true);
 					}
-
+					break;
+				case "AUTHENTICATE_FAIL":
+					control.connectionClosed(con);  //remove connection
+					term = true;
 					break;
 				case "ACTIVITY_MESSAGE":
 					outgoingObj = activityMessage(incomingObj);
@@ -308,6 +324,21 @@ public class Control extends Thread {
 		log.info("using activity interval of "+Settings.getActivityInterval()+" milliseconds");
 		while(!term){
 			// do something with 5 second intervals in between
+			
+			//zhenyuan
+			JSONObject outgoingObj = new JSONObject();
+			outgoingObj.put("command", "SERVER_ANNOUNCE");
+			outgoingObj.put("id",id);
+			outgoingObj.put("load",load);
+			outgoingObj.put("hostname",localhost);
+			outgoingObj.put("port",localport);
+			for(int i=0;i< connections.size();i++) {
+				if(connections.get(i).getAuthenticatedServer()) {
+					connections.get(i).writeMsg(outgoingObj.toJSONString());
+				}		
+			}
+			//zhenyuan
+			
 			try {
 				Thread.sleep(Settings.getActivityInterval());
 			} catch (InterruptedException e) {
