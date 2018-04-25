@@ -49,6 +49,21 @@ public class ClientSkeleton extends Thread {
 			    out = new DataOutputStream(socket.getOutputStream());
 			    inreader = new BufferedReader(new InputStreamReader(in));
 			    outwriter = new PrintWriter(out, true);
+			    JSONObject outcomingObj = new JSONObject();
+			    
+			    if(Settings.getSecret() == null) {
+			    	outcomingObj.put("command", "REGISTER");
+			    	outcomingObj.put("username", Settings.getUsername());
+			    	outcomingObj.put("secret", Settings.nextSecret());
+			    	
+			    }else {
+			    	outcomingObj.put("command", "LOGIN");
+			    	outcomingObj.put("username", Settings.getUsername());
+			    	outcomingObj.put("secret", Settings.getSecret());
+			    }
+			    	outwriter.println(outcomingObj.toString());
+			    	outwriter.flush(); 
+			    
 			}
 			} catch (UnknownHostException e) {
 				// TODO Auto-generated catch block
