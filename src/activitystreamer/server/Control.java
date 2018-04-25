@@ -19,7 +19,9 @@ public class Control extends Thread {
 	private static Listener listener;
 	private static ArrayList<String> usernameList;
 	private static ArrayList<String> secretList;
-	private static ArrayList<String> loginList;
+	private static ArrayList<Integer> remotePortList;
+	private static ArrayList<String> remoteNameList;
+	private static ArrayList<Integer> remoteLoadList;
 	private static String serverSecret = Settings.getSecret();
 	private static String id = Settings.nextSecret();
 	private static String localhost = Settings.getLocalHostname();
@@ -41,7 +43,9 @@ public class Control extends Thread {
 		connections = new ArrayList<Connection>();
 		usernameList = new ArrayList<String>();
 		secretList = new ArrayList<String>();
-		loginList = new ArrayList<String>();
+		remotePortList = new ArrayList<Integer>();
+		remoteNameList = new ArrayList<String>();
+		remoteLoadList = new ArrayList<Integer>();
 		load = 0;
 		// start a listener
 		try {
@@ -52,6 +56,7 @@ public class Control extends Thread {
 		}	
 	}
 	
+	@SuppressWarnings("unchecked")
 	public void initiateConnection(){
 		// make a connection to another server if remote hostname is supplied
 		if(Settings.getRemoteHostname()!=null){
@@ -90,7 +95,7 @@ public class Control extends Thread {
 	
 	//zhenyuan&xueyang
 	@SuppressWarnings("unchecked")
-	public static void cmdOperator(Connection con,JSONObject incomingObj) {
+	public static void cmdOperator(Connection con, JSONObject incomingObj) {
 		JSONObject outgoingObj = null;
 		
 		
@@ -98,7 +103,12 @@ public class Control extends Thread {
 			String cmd = (String) incomingObj.get("command");
 			switch(cmd){
 				case "LOGIN":
-					outgoingObj = login(incomingObj);
+					if(ifLogin(incomingObj)) {
+						outgoingObj = loginSuccess(incomingObj);
+						redirect(con, incomingObj);
+					}else {
+						outgoingObj = loginFail(incomingObj);
+					}
 					con.writeMsg(outgoingObj.toJSONString());
 					load++;
 					break;
@@ -125,6 +135,17 @@ public class Control extends Thread {
 					control.connectionClosed(con);  //remove connection
 					term = true;
 					break;
+				case "SERVER_ANNOUNCE":
+					remoteLoadList.add((Integer) incomingObj.get("load"));
+					remoteNameList.add(incomingObj.get("hostname").toString());
+					remotePortList.add((Integer) incomingObj.get("port"));
+					for(int i=0;i< connections.size();i++) {
+						if (i != connections.indexOf(con) && connections.get(i).getAuthenticatedServer()) {
+						connections.get(i).writeMsg(incomingObj.toJSONString());
+						}
+					}
+					break;
+					
 				case "ACTIVITY_MESSAGE":
 					outgoingObj = activityMessage(incomingObj);
 					for(int i=0;i< connections.size();i++) {
@@ -163,10 +184,7 @@ public class Control extends Thread {
 	
 	//zhenyuan&xueyang
 	
-	//zhenyuan
-	@SuppressWarnings("unchecked")
-	public static JSONObject login(JSONObject incomingObj) {
-		JSONObject outgoingObj = new JSONObject();
+	public static boolean ifLogin(JSONObject incomingObj) {
 		boolean successLogin = false;
 		String username = (String) incomingObj.get("username");
 		String secret = (String) incomingObj.get("secret");
@@ -176,24 +194,57 @@ public class Control extends Thread {
 		}else if(usernameList.contains(username) && secretList.contains(secret)) {
 			if(usernameList.indexOf(username) == secretList.indexOf(secret)) {
 				successLogin = true;
-				loginList.add(username);
 			}
 		}
+		return successLogin;
+	}
+	
+	
+	
+	//zhenyuan
+	@SuppressWarnings("unchecked")
+	public static JSONObject loginSuccess(JSONObject incomingObj) {
 		
-		if(successLogin) {
-			log.info("LOGIN SUCCESS!");
-			outgoingObj.put("command", "LOGIN_SUCCESS");
-			outgoingObj.put("info", "logged in as user "+username);
-		}
-		else {
-			outgoingObj.put("command", "LOGIN_FAILED");
-			outgoingObj.put("info", "attempt to login with wrong secret");	
-		}
+		JSONObject outgoingObj = new JSONObject();
+		String username = (String) incomingObj.get("username");
+		
+		log.info("LOGIN SUCCESS!");
+		outgoingObj.put("command", "LOGIN_SUCCESS");
+		outgoingObj.put("info", "logged in as user "+username);
 		
 		return outgoingObj;
 	}
 	//zhenyuan
 	
+	//zhenyuan
+	@SuppressWarnings("unchecked")
+	public static JSONObject loginFail(JSONObject incomingObj) {
+		
+		JSONObject outgoingObj = new JSONObject();
+
+		outgoingObj.put("command", "LOGIN_FAILED");
+		outgoingObj.put("info", "attempt to login with wrong secret");	
+		
+		return outgoingObj;
+	}
+	//zhenyuan
+	
+	//zhenyuan
+	@SuppressWarnings("unchecked")
+	public static void redirect(Connection con, JSONObject incomingObj) {
+		JSONObject outgoingObj = new JSONObject();
+		for(int i=0; i<remoteLoadList.size(); i++) {
+			if(remoteLoadList.get(i) <= load - 2) {
+				outgoingObj.put("command", "REDIRECT");
+				outgoingObj.put("hostname", remoteNameList.get(i));
+				outgoingObj.put("port", remotePortList.get(i));
+				con.writeMsg(outgoingObj.toJSONString());
+				con.closeCon();
+				break;
+			}		
+		}
+	}
+	//zhenyuan
 	
 	//zhenyuan
 	@SuppressWarnings("unchecked")
@@ -233,7 +284,7 @@ public class Control extends Thread {
 		return outgoingObj;
 	}
 	
-	@SuppressWarnings("unchecked")
+
 	public static boolean authenticateFail(JSONObject incomingObj) {
 		String secret = (String) incomingObj.get("secret");
 		return !secret.equals(serverSecret);
@@ -319,6 +370,7 @@ public class Control extends Thread {
 		
 	}
 	
+	@SuppressWarnings("unchecked")
 	@Override
 	public void run(){
 		log.info("using activity interval of "+Settings.getActivityInterval()+" milliseconds");
