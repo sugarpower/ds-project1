@@ -108,7 +108,7 @@ public class Server {
 		}
 		
 		log.info("starting server");
-		
+		log.info("secret for "+Settings.getUsername()+" is "+Settings.getSecret());
 		
 		final Control c = Control.getInstance(); 
 		c.initiateConnection();

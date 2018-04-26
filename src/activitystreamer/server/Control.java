@@ -3,6 +3,8 @@ package activitystreamer.server;
 import java.io.IOException;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -17,17 +19,16 @@ public class Control extends Thread {
 	private static ArrayList<Connection> connections;
 	private static boolean term=false;
 	private static Listener listener;
-	private static ArrayList<String> usernameList;
-	private static ArrayList<String> secretList;
-	private static ArrayList<Integer> remotePortList;
-	private static ArrayList<String> remoteNameList;
-	private static ArrayList<Integer> remoteLoadList;
+	private static Map<String,String> userList;
+	private static Map<String,Integer> remoteList;
+	private static ArrayList<Connection> serversList;
 	private static String serverSecret = Settings.getSecret();
 	private static String id = Settings.nextSecret();
 	private static String localhost = Settings.getLocalHostname();
 	private static int localport = Settings.getLocalPort();
-	private static int load = 0 ;
+	private static int load = 0;
 	private JSONParser parser = new JSONParser();
+	
 	
 	protected static Control control = null;
 	
@@ -41,19 +42,18 @@ public class Control extends Thread {
 	public Control() {
 		// initialize the connections array
 		connections = new ArrayList<Connection>();
-		usernameList = new ArrayList<String>();
-		secretList = new ArrayList<String>();
-		remotePortList = new ArrayList<Integer>();
-		remoteNameList = new ArrayList<String>();
-		remoteLoadList = new ArrayList<Integer>();
-		load = 0;
+		userList = new HashMap<String, String>();
+		remoteList = new HashMap<String, Integer>();
+		serversList = new ArrayList<Connection>();
+		
 		// start a listener
 		try {
 			listener = new Listener();
 		} catch (IOException e1) {
 			log.fatal("failed to startup a listening thread: "+e1);
 			System.exit(-1);
-		}	
+		}
+		start();
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -68,6 +68,7 @@ public class Control extends Thread {
 				outgoingObj.put("command", "AUTHENTICATE");
 				outgoingObj.put("secret", serverSecret);
 				connections.get(0).writeMsg(outgoingObj.toJSONString());
+				serversList.add(connections.get(0));
 				//zhenyuan
 				
 			} catch (IOException e) {
@@ -123,25 +124,28 @@ public class Control extends Thread {
 					load--;
 					break;
 				case "AUTHENTICATE":
+					serversList.add(con);
 					if(authenticateFail(incomingObj)) {
 						outgoingObj = authenticateReply(incomingObj);
 						con.writeMsg(outgoingObj.toJSONString());
+						serversList.remove(con);
 						control.connectionClosed(con);  //remove connection
-					}else {
-						con.setAuthenticatedServer(true);
 					}
 					break;
 				case "AUTHENTICATE_FAIL":
+					serversList.remove(con);
 					control.connectionClosed(con);  //remove connection
 					term = true;
 					break;
 				case "SERVER_ANNOUNCE":
-					log.info("INCOMING SERVER_ANNOUNCE");
-					remoteLoadList.add((Integer) incomingObj.get("load"));
-					remoteNameList.add(incomingObj.get("hostname").toString());
-					remotePortList.add((Integer) incomingObj.get("port"));
+					log.info("incoming server announce");
+					
+					remoteList.put(incomingObj.get("hostname").toString()+":"+incomingObj.get("port").toString(), Integer.valueOf(incomingObj.get("load").toString()));
+	
+					
+					log.info("load is "+load);
 					for(int i=0;i< connections.size();i++) {
-						if (i != connections.indexOf(con) && connections.get(i).getAuthenticatedServer()) {
+						if (i != connections.indexOf(con) && serversList.contains(connections.get(i))) {
 						connections.get(i).writeMsg(incomingObj.toJSONString());
 						}
 					}
@@ -150,7 +154,7 @@ public class Control extends Thread {
 				case "ACTIVITY_MESSAGE":
 					outgoingObj = activityMessage(incomingObj);
 					for(int i=0;i< connections.size();i++) {
-						if (i != connections.indexOf(con)) {
+						if (i != connections.indexOf(con) && serversList.contains(connections.get(i))) {
 						connections.get(i).writeMsg(outgoingObj.toJSONString());
 						}
 					}
@@ -158,7 +162,7 @@ public class Control extends Thread {
 				case "ACTIVITY_BROADCAST":
 					outgoingObj = incomingObj;
 					for(int i=0;i< connections.size();i++) {
-						if (i != connections.indexOf(con)) {
+						if (i != connections.indexOf(con) && serversList.contains(connections.get(i))) {
 						connections.get(i).writeMsg(outgoingObj.toJSONString());
 						}
 					}
@@ -192,10 +196,8 @@ public class Control extends Thread {
 		
 		if(username.equals("anonymous")) {
 			successLogin = true;
-		}else if(usernameList.contains(username) && secretList.contains(secret)) {
-			if(usernameList.indexOf(username) == secretList.indexOf(secret)) {
+		}else if(userList.get(username)==secret) {
 				successLogin = true;
-			}
 		}
 		return successLogin;
 	}
@@ -234,17 +236,19 @@ public class Control extends Thread {
 	@SuppressWarnings("unchecked")
 	public static void redirect(Connection con, JSONObject incomingObj) {
 		JSONObject outgoingObj = new JSONObject();
-		for(int i=0; i<remoteLoadList.size(); i++) {
-			if(remoteLoadList.get(i) <= load - 2) {
+		for(String key: remoteList.keySet()) {
+			log.info("remote load is "+remoteList.get(key));
+			if(remoteList.get(key).intValue() < load - 1) {
 				log.info("REDIRECT!");
 				outgoingObj.put("command", "REDIRECT");
-				outgoingObj.put("hostname", remoteNameList.get(i));
-				outgoingObj.put("port", remotePortList.get(i));
+				outgoingObj.put("hostname", key.substring(0, key.indexOf(":")-1));
+				outgoingObj.put("port", Integer.valueOf(key.substring(key.indexOf(":")+1)));
 				con.writeMsg(outgoingObj.toJSONString());
 				con.closeCon();
 				break;
-			}		
+			}
 		}
+		
 	}
 	//zhenyuan
 	
@@ -257,21 +261,21 @@ public class Control extends Thread {
 		String secret = (String) incomingObj.get("secret");
 		
 		//TODO verify if successRegister
-		if(!usernameList.contains(username)) {
+		if(!userList.containsKey(username)) {
 			successRegister = true;
 		}
 		
 		
 		if(successRegister) {
 			log.info("REGISTER SUCCESS!");
-			usernameList.add(username);
-			secretList.add(secret);
+			userList.put(username,secret);
 			outgoingObj.put("command", "REGISTER_SUCCESS");
 			outgoingObj.put("info", "register success for "+username);
 			
 			JSONObject outgoingObj1 = new JSONObject();
 			outgoingObj1 = loginSuccess(incomingObj);
 			con.writeMsg(outgoingObj1.toJSONString());
+			load++;
 			redirect(con, incomingObj);
 			
 		}else {
@@ -319,10 +323,8 @@ public class Control extends Thread {
 		
 		if(username.equals("anonymous")) {
 			successLogin = true;
-		}else if(usernameList.contains(username) && secretList.contains(secret)) {
-			if(usernameList.indexOf(username) == secretList.indexOf(secret)) {
+		}else if(userList.get(username)==secret) {
 				successLogin = true;
-			}
 		}
 		
 		if(successLogin) {
@@ -338,12 +340,11 @@ public class Control extends Thread {
 		String username = (String) incomingObj.get("username");
 		String secret = (String) incomingObj.get("secret");
 		
-		if(usernameList.contains(username)){
+		if(userList.containsKey(username)){
 			outgoingObj.put("command", "LOCK_DENIED");
 		}else {
 			outgoingObj.put("command", "ALLOWED");
-			usernameList.add(username);
-			secretList.add(secret);
+			userList.put(username,secret);
 		}
 		outgoingObj.put("username", username);
 		outgoingObj.put("secret", secret);
@@ -388,7 +389,6 @@ public class Control extends Thread {
 			// do something with 5 second intervals in between
 			
 			//zhenyuan
-			log.info("RUN");
 			JSONObject outgoingObj = new JSONObject();
 			outgoingObj.put("command", "SERVER_ANNOUNCE");
 			outgoingObj.put("id",id);
@@ -396,10 +396,10 @@ public class Control extends Thread {
 			outgoingObj.put("hostname",localhost);
 			outgoingObj.put("port",localport);
 			for(int i=0;i< connections.size();i++) {
-				if(connections.get(i).getAuthenticatedServer()) {
+				if (serversList.contains(connections.get(i))) {
 					connections.get(i).writeMsg(outgoingObj.toJSONString());
-					log.info("OUTCOMING SERVER_ANNOUNCE");
-				}		
+					log.info("outgoing server announce");
+				}
 			}
 			//zhenyuan
 			

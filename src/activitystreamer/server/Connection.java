@@ -25,9 +25,6 @@ public class Connection extends Thread {
 	private Socket socket;
 	private boolean term=false;
 	
-	//zhenyuan
-	private boolean authenticatedServer;
-	//zhenyuan
 	
 	//Zhenyuan: change to public
 	public Connection(Socket socket) throws IOException{
@@ -37,9 +34,6 @@ public class Connection extends Thread {
 	    outwriter = new PrintWriter(out, true);
 	    this.socket = socket;
 	    open = true;
-	    
-	    authenticatedServer = false;
-	    
 	    start();
 	}
 	
@@ -94,12 +88,5 @@ public class Connection extends Thread {
 		return open;
 	}
 	
-	public boolean getAuthenticatedServer() {
-		return authenticatedServer;
-	}
-	
-	public void setAuthenticatedServer(boolean authenticatedServer) {
-		this.authenticatedServer = authenticatedServer;
-	}
 	
 }
