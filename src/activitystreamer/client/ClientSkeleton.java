@@ -39,6 +39,7 @@ public class ClientSkeleton extends Thread {
 		return clientSolution;
 	}
 	
+	@SuppressWarnings("unchecked")
 	public ClientSkeleton(){
 		
 		//Zhenyuan
@@ -79,11 +80,6 @@ public class ClientSkeleton extends Thread {
 	}
 	
 	
-	
-	
-	
-	
-	@SuppressWarnings("unchecked")
 	public void sendActivityObject(JSONObject activityObj){
 		//Zhenyuan
 		outwriter.println(activityObj.toString());
@@ -128,6 +124,7 @@ public class ClientSkeleton extends Thread {
 				Settings.setRemotePort((int)incomingObj.get("port"));
 				clientSolution.disconnect();
 				clientSolution = new ClientSkeleton();
+				log.info("client redirect");
 			}
 			
 		} catch (IOException e) {

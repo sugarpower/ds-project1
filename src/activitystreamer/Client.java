@@ -86,7 +86,7 @@ public class Client {
 		
 			
 		ClientSkeleton c = ClientSkeleton.getInstance(); 
-	
+		log.info("secret for "+Settings.getUsername()+" is "+Settings.getSecret());
 				
 			
 		
