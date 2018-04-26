@@ -120,8 +120,15 @@ public class ClientSkeleton extends Thread {
 			String command = (String) incomingObj.get("command");
 			
 			if(command.equals("INVALID_MESSAGE")) {
-				this.disconnect();
+				clientSolution.disconnect();
 			}		
+			
+			if(command.equals("REDIRECT")) {
+				Settings.setRemoteHostname(incomingObj.get("hostname").toString());
+				Settings.setRemotePort((int)incomingObj.get("port"));
+				clientSolution.disconnect();
+				clientSolution = new ClientSkeleton();
+			}
 			
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
