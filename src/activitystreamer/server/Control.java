@@ -113,7 +113,7 @@ public class Control extends Thread {
 					load++;
 					break;
 				case "REGISTER":
-					outgoingObj = register(incomingObj);
+					outgoingObj = register(con, incomingObj);
 					con.writeMsg(outgoingObj.toJSONString());
 					break;
 				case "LOGOUT" :
@@ -136,6 +136,7 @@ public class Control extends Thread {
 					term = true;
 					break;
 				case "SERVER_ANNOUNCE":
+					log.info("INCOMING SERVER_ANNOUNCE");
 					remoteLoadList.add((Integer) incomingObj.get("load"));
 					remoteNameList.add(incomingObj.get("hostname").toString());
 					remotePortList.add((Integer) incomingObj.get("port"));
@@ -235,6 +236,7 @@ public class Control extends Thread {
 		JSONObject outgoingObj = new JSONObject();
 		for(int i=0; i<remoteLoadList.size(); i++) {
 			if(remoteLoadList.get(i) <= load - 2) {
+				log.info("REDIRECT!");
 				outgoingObj.put("command", "REDIRECT");
 				outgoingObj.put("hostname", remoteNameList.get(i));
 				outgoingObj.put("port", remotePortList.get(i));
@@ -248,7 +250,7 @@ public class Control extends Thread {
 	
 	//zhenyuan
 	@SuppressWarnings("unchecked")
-	public static JSONObject register(JSONObject incomingObj) {
+	public static JSONObject register(Connection con, JSONObject incomingObj) {
 		JSONObject outgoingObj = new JSONObject();
 		boolean successRegister = false;
 		String username = (String) incomingObj.get("username");
@@ -266,6 +268,12 @@ public class Control extends Thread {
 			secretList.add(secret);
 			outgoingObj.put("command", "REGISTER_SUCCESS");
 			outgoingObj.put("info", "register success for "+username);
+			
+			JSONObject outgoingObj1 = new JSONObject();
+			outgoingObj1 = loginSuccess(incomingObj);
+			con.writeMsg(outgoingObj1.toJSONString());
+			redirect(con, incomingObj);
+			
 		}else {
 			outgoingObj.put("command", "REGISTER_FAILED");
 			outgoingObj.put("info", username+" is already registered with the system");
@@ -380,6 +388,7 @@ public class Control extends Thread {
 			// do something with 5 second intervals in between
 			
 			//zhenyuan
+			log.info("RUN");
 			JSONObject outgoingObj = new JSONObject();
 			outgoingObj.put("command", "SERVER_ANNOUNCE");
 			outgoingObj.put("id",id);
@@ -389,6 +398,7 @@ public class Control extends Thread {
 			for(int i=0;i< connections.size();i++) {
 				if(connections.get(i).getAuthenticatedServer()) {
 					connections.get(i).writeMsg(outgoingObj.toJSONString());
+					log.info("OUTCOMING SERVER_ANNOUNCE");
 				}		
 			}
 			//zhenyuan
