@@ -255,8 +255,10 @@ public class Control extends Thread {
 		String secret = (String) incomingObj.get("secret");
 		
 		//TODO verify if successRegister
-		//assume successfully Register
-		successRegister = true;
+		if(!usernameList.contains(username)) {
+			successRegister = true;
+		}
+		
 		
 		if(successRegister) {
 			log.info("REGISTER SUCCESS!");
