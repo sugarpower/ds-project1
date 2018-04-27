@@ -113,6 +113,7 @@ public class ClientSkeleton extends Thread {
 	}
 	//Xueyang
 	
+	@SuppressWarnings("unchecked")
 	public void run(){
 		while(!term) {
 		JSONObject incomingObj;
@@ -127,13 +128,13 @@ public class ClientSkeleton extends Thread {
 			
 			if(command.equals("REDIRECT")) {
 				Settings.setRemoteHostname(incomingObj.get("hostname").toString());
-				Settings.setRemotePort((int)incomingObj.get("port"));
+				Settings.setRemotePort(Integer.parseInt(incomingObj.get("port").toString()));
 				clientSolution.disconnect();
-				clientSolution = new ClientSkeleton();
 				log.info("client redirect");
+				clientSolution = new ClientSkeleton();
 			}
 		
-			if(command.equals("REGISTER_FAILED") || command.equals("LOGIN_FAILED")) {
+			if(command.equals("REGISTER_FAILED") || command.equals("LOGIN_FAILED") || command.equals("AUTHENTICATION_FAIL")) {
 				clientSolution.disconnect();
 				log.info(incomingObj.get("info").toString());
 			}

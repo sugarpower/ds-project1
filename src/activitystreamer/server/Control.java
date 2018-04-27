@@ -28,7 +28,8 @@ public class Control extends Thread {
 	private static String localhost = Settings.getLocalHostname();
 	private static int localport = Settings.getLocalPort();
 	private static int load = 0;
-	private static ArrayList<WaitingMessage> waitings;//
+	private static ArrayList<WaitingMessage> waitings;
+	private static ArrayList<String> loginList;
 	private JSONParser parser = new JSONParser();
 	
 	
@@ -47,7 +48,8 @@ public class Control extends Thread {
 		userList = new HashMap<String, String>();
 		remoteList = new HashMap<String, Integer>();
 		serversList = new ArrayList<Connection>();
-		 waitings= new  ArrayList<WaitingMessage>();
+		waitings= new  ArrayList<WaitingMessage>();
+		loginList = new ArrayList<String>(); 
 		
 		// start a listener
 		try {
@@ -65,7 +67,6 @@ public class Control extends Thread {
 		if(Settings.getRemoteHostname()!=null){
 			try {
 				outgoingConnection(new Socket(Settings.getRemoteHostname(),Settings.getRemotePort()));
-				
 				//zhenyuan
 				JSONObject outgoingObj = new JSONObject();
 				outgoingObj.put("command", "AUTHENTICATE");
@@ -78,6 +79,9 @@ public class Control extends Thread {
 				log.error("failed to make connection to "+Settings.getRemoteHostname()+":"+Settings.getRemotePort()+" :"+e);
 				System.exit(-1);
 			}
+		}else {
+			//serverSecret=Settings.nextSecret();
+			log.info("server secret is: "+serverSecret);
 		}
 	}
 	
@@ -85,6 +89,7 @@ public class Control extends Thread {
 	 * Processing incoming messages from the connection.
 	 * Return true if the connection should close.
 	 */
+	@SuppressWarnings("unchecked")
 	public synchronized boolean process(Connection con,String msg){
 		//zhenyuan
 		try {
@@ -92,6 +97,12 @@ public class Control extends Thread {
 			cmdOperator(con,incomingObj);          //xueyang
 		} catch (Exception e) {
 			log.error("invalid JSON object");
+			JSONObject outgoingObj = new JSONObject();
+			outgoingObj.put("command", "INVALID_MESSAGE");
+			outgoingObj.put("command", "JSON parse error while parsing message");
+			con.writeMsg(outgoingObj.toJSONString());
+			control.connectionClosed(con);
+			con.closeCon();
 		}
 		//zhenyuan
 		return false;
@@ -102,27 +113,29 @@ public class Control extends Thread {
 	public static void cmdOperator(Connection con, JSONObject incomingObj) {
 		JSONObject outgoingObj = null;
 		
-		
 		if(incomingObj.containsKey("command")) {
 			String cmd = (String) incomingObj.get("command");
 			switch(cmd){
 				case "LOGIN":
 					if(ifLogin(incomingObj)) {
+						load++;
 						outgoingObj = loginSuccess(incomingObj);
 						redirect(con, incomingObj);
 					}else {
 						outgoingObj = loginFail(incomingObj);
 					}
 					con.writeMsg(outgoingObj.toJSONString());
-					load++;
 					break;
 				case "REGISTER":
 					register(con, incomingObj);
 					break;
 				case "LOGOUT" :
-					//TODO remove it from loginList
+					if(!incomingObj.get("username").toString().equals("anonymous")) {
+						loginList.remove(incomingObj.get("username").toString());
+					}
 					control.connectionClosed(con);  //remove connection
-					term=true;         //disconnect //see if it works
+					con.closeCon();
+					term=true;         //disconnect
 					load--;
 					break;
 				case "AUTHENTICATE":
@@ -132,17 +145,19 @@ public class Control extends Thread {
 						con.writeMsg(outgoingObj.toJSONString());
 						serversList.remove(con);
 						control.connectionClosed(con);  //remove connection
+						con.closeCon();
 					}
 					break;
-				case "AUTHENTICATE_FAIL":
+				case "AUTHTENTICATION_FAIL":
 					serversList.remove(con);
 					control.connectionClosed(con);  //remove connection
-					term = true;
+					con.closeCon();
 					break;
 				case "SERVER_ANNOUNCE":
 					log.info("incoming server announce");
+					
 					remoteList.put(incomingObj.get("hostname").toString()+":"+incomingObj.get("port").toString(), Integer.valueOf(incomingObj.get("load").toString()));
-	
+					
 					log.info("load is "+load);
 					for(int i=0;i< connections.size();i++) {
 						if (i != connections.indexOf(con) && serversList.contains(connections.get(i))) {
@@ -152,33 +167,28 @@ public class Control extends Thread {
 					break;
 					
 				case "ACTIVITY_MESSAGE":
-					outgoingObj = activityMessage(incomingObj);
-					for(int i=0;i< connections.size();i++) {
-						if (i != connections.indexOf(con) && serversList.contains(connections.get(i))) {
-						connections.get(i).writeMsg(outgoingObj.toJSONString());
-						}
-					}
+					activityMessage(con,incomingObj);
 					break;
 				case "ACTIVITY_BROADCAST":
 					outgoingObj = incomingObj;
 					for(int i=0;i< connections.size();i++) {
-						if (i != connections.indexOf(con) && serversList.contains(connections.get(i))) {
+						if (i != connections.indexOf(con)) {
 						connections.get(i).writeMsg(outgoingObj.toJSONString());
 						}
 					}
 				case "LOCK_REQUEST":
 					lockReply(con,incomingObj);
 					break;
-				case "LOCK_ALLOWED"://
+				case "LOCK_ALLOWED":
 					lockAllowed(con,incomingObj);
 					break;
-				case "LOCK_DENY"://
+				case "LOCK_DENY":
 					lockDenied(con,incomingObj);
 					break;
 				default:
 					outgoingObj = new JSONObject();
 					outgoingObj.put( "command", "INVALID_MESSAGE");
-					outgoingObj.put( "info", "JSON parse error while parsing message");
+					outgoingObj.put( "info", "No command "+cmd);
 					con.writeMsg(outgoingObj.toJSONString());
 		}
 		} else {
@@ -226,12 +236,14 @@ public class Control extends Thread {
 	public synchronized static void lockAllowed(Connection con, JSONObject incomingObj) {
 		String username=(String)incomingObj.get("username");
 		String secret=(String)incomingObj.get("secret");
-		
-		for(WaitingMessage temp : waitings) 
+		log.info("6");
+		for(WaitingMessage temp : waitings) {
+			log.info("5");
 			if(temp.getKey().equals(username+secret)) {
 				temp.setNum();
-                
+				log.info("4");
 				if(temp.compare()) {
+					log.info("3");
 					JSONObject outgoingObj=new JSONObject();
 					if(serversList.contains(temp.getConnection())) {
 						outgoingObj.put("command", "LOCK_ALLOWED");
@@ -243,15 +255,23 @@ public class Control extends Thread {
 						log.info("REGISTER SUCCESS!");
 					    outgoingObj.put("command", "REGISTER_SUCCESS");
 						outgoingObj.put("info", "register success for "+username);
-						load++;
 						temp.getConnection().writeMsg(outgoingObj.toJSONString());
+						
+						load++;
+						JSONObject loginObj = new JSONObject();
+						log.info("LOGIN SUCCESS!");
+						loginObj.put("command", "LOGIN_SUCCESS");
+						loginObj.put("info", "logged in as user "+username);
+						con.writeMsg(loginObj.toJSONString());
 						userList.put(username, secret);
+						log.info("falg master");
 						redirect(temp.getConnection(), incomingObj);
 					}
 					waitings.remove(temp);
 					break;
 				}
 			}
+	}
 	}
 
 	//zhenyuan&xueyang
@@ -279,7 +299,7 @@ public class Control extends Thread {
 		log.info("LOGIN SUCCESS!");
 		outgoingObj.put("command", "LOGIN_SUCCESS");
 		outgoingObj.put("info", "logged in as user "+username);
-		
+		loginList.add(username);
 		return outgoingObj;
 	}
 	//zhenyuan
@@ -303,13 +323,18 @@ public class Control extends Thread {
 		JSONObject outgoingObj = new JSONObject();
 		for(String key: remoteList.keySet()) {
 			log.info("remote load is "+remoteList.get(key));
+			log.info("load is "+load);
 			if(remoteList.get(key).intValue() < load - 1) {
 				log.info("REDIRECT!");
+				if(!incomingObj.get("username").toString().equals("anonymous")) {
+					loginList.remove(incomingObj.get("username").toString());
+				}
 				outgoingObj.put("command", "REDIRECT");
-				outgoingObj.put("hostname", key.substring(0, key.indexOf(":")-1));
+				outgoingObj.put("hostname", key.substring(0, key.indexOf(":")));
 				outgoingObj.put("port", Integer.valueOf(key.substring(key.indexOf(":")+1)));
 				con.writeMsg(outgoingObj.toJSONString());
 				con.closeCon();
+				load--;
 				break;
 			}
 		}
@@ -333,8 +358,16 @@ public class Control extends Thread {
 				log.info("REGISTER SUCCESS!");
 			    outgoingObj.put("command", "REGISTER_SUCCESS");
 				outgoingObj.put("info", "register success for"+username);
-				load++;
 				con.writeMsg(outgoingObj.toJSONString());
+				loginList.add(username);
+				load++;
+				JSONObject loginObj = new JSONObject();
+				log.info("LOGIN SUCCESS!");
+				loginObj.put("command", "LOGIN_SUCCESS");
+				loginObj.put("info", "logged in as user "+username);
+				con.writeMsg(loginObj.toJSONString());
+					
+				
 			}
 			else {
 			userList.put(username,secret);
@@ -343,7 +376,7 @@ public class Control extends Thread {
 			outgoingObj.put("secret", secret);
 			waitings.add(new WaitingMessage(con,"LOCK_REQUEST",username+secret,serversList.size()));
 			for(int i=0;i<serversList.size();i++) {
-			    serversList.get(i).writeMsg(outgoingObj.toJSONString());	
+				serversList.get(i).writeMsg(outgoingObj.toJSONString());	
 			}
 			}
 		}
@@ -370,7 +403,7 @@ public class Control extends Thread {
 	}
 	
 	@SuppressWarnings("unchecked")
-	public static JSONObject activityMessage(JSONObject incomingObj) {
+	public static void activityMessage(Connection con,JSONObject incomingObj) {
 		JSONObject outgoingObj = new JSONObject();
 		boolean successLogin = false;
 		String username = (String) incomingObj.get("username");
@@ -379,15 +412,26 @@ public class Control extends Thread {
 		
 		if(username.equals("anonymous")) {
 			successLogin = true;
-		}else if(userList.get(username).equals(secret)) {
+		}else if(loginList.contains(username) && userList.get(username).equals(secret)) {
 				successLogin = true;
 		}
 		
 		if(successLogin) {
 			outgoingObj.put("command", "ACTIVITY_BROADCAST");
 			outgoingObj.put("activity", activity);
+			for(int i=0;i< connections.size();i++) {
+				if (i != connections.indexOf(con)) {
+				connections.get(i).writeMsg(outgoingObj.toJSONString());
+				}
+			}
 		}
-		return outgoingObj;
+		else {
+			   outgoingObj.put("command", "AUTHENTICATION_FAIL");
+			   outgoingObj.put("info", "anonymous or the user is not login");
+			   con.writeMsg(outgoingObj.toJSONString());
+			   loginList.remove(username);
+			   con.closeCon();
+			  }
 	}
 
 	@SuppressWarnings("unchecked")
@@ -402,13 +446,14 @@ public class Control extends Thread {
 			outgoingObj.put("secret", secret);
 			con.writeMsg(outgoingObj.toJSONString());
 		}else {
-			log.info("2");
 			if(serversList.size()==1) {
+				log.info("2");
 				outgoingObj.put("command", "LOCK_ALLOWED");
 				outgoingObj.put("username", username);
 				outgoingObj.put("secret", secret);
 				userList.put(username, secret);
 				con.writeMsg(outgoingObj.toJSONString());
+				log.info("7");
 			}
 			else {
 			waitings.add(new WaitingMessage(con,"LOCK_REQUEST",username+secret,serversList.size()-1));
