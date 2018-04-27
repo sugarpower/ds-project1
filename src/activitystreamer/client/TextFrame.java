@@ -25,6 +25,8 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 
+import activitystreamer.util.Settings;
+
 @SuppressWarnings("serial")
 public class TextFrame extends JFrame implements ActionListener {
 	private static final Logger log = LogManager.getLogger();
@@ -86,6 +88,7 @@ public class TextFrame extends JFrame implements ActionListener {
 		outputText.repaint();
 	}
 	
+	@SuppressWarnings("unchecked")
 	@Override
 	public void actionPerformed(ActionEvent e) {
 		if(e.getSource()==sendButton){
@@ -93,6 +96,11 @@ public class TextFrame extends JFrame implements ActionListener {
 			JSONObject obj;
 			try {
 				obj = (JSONObject) parser.parse(msg);
+				obj.put("username", Settings.getUsername());
+				if(Settings.getSecret()!=null) {
+					obj.put("secret", Settings.getSecret());
+				}
+				obj.put("command", "ACTIVITY_MESSAGE");
 				ClientSkeleton.getInstance().sendActivityObject(obj);
 			} catch (ParseException e1) {
 				log.error("invalid JSON object entered into input text field, data not sent");

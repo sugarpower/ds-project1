@@ -80,7 +80,7 @@ public class Control extends Thread {
 				System.exit(-1);
 			}
 		}else {
-			//serverSecret=Settings.nextSecret();
+			serverSecret=Settings.nextSecret();
 			log.info("server secret is: "+serverSecret);
 		}
 	}
@@ -422,7 +422,7 @@ public class Control extends Thread {
 		
 		if(username.equals("anonymous")) {
 			successLogin = true;
-		}else if(loginList.contains(username) && userList.get(username).equals(secret)) {
+		}else if(/**loginList.contains(username) && **/ userList.get(username).equals(secret)) {
 				successLogin = true;
 		}
 		
@@ -437,7 +437,7 @@ public class Control extends Thread {
 		}
 		else {
 			   outgoingObj.put("command", "AUTHENTICATION_FAIL");
-			   outgoingObj.put("info", "anonymous or the user is not login");
+			   outgoingObj.put("info", "user did not login");
 			   con.writeMsg(outgoingObj.toJSONString());
 			   loginList.remove(username);
 			   con.closeCon();
