@@ -6,7 +6,6 @@ public class WaitingMessage {
              private Connection con;
              private String command;
              private String key;
-             private String[] recieve;
              private int expect;
              private int num;
              
@@ -22,11 +21,6 @@ public class WaitingMessage {
             	this.num++;
             }
 
-            public void setRecieve(String recieve){
-            	this.recieve[num]=recieve;
-            	this.setNum();
-            }
-
             public String getKey() {
             	return this.key;
             }
@@ -35,6 +29,9 @@ public class WaitingMessage {
             	return this.con;
             }
             
+            public int getNum() {
+            	return this.num;
+            }
 			public boolean compare() {
             	return this.num==this.expect;
             }

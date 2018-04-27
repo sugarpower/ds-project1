@@ -229,11 +229,10 @@ public class Control extends Thread {
 		
 		for(WaitingMessage temp : waitings) 
 			if(temp.getKey().equals(username+secret)) {
-				temp.setRecieve(incomingObj.toJSONString());
 				temp.setNum();
+                
 				if(temp.compare()) {
 					JSONObject outgoingObj=new JSONObject();
-					
 					if(serversList.contains(temp.getConnection())) {
 						outgoingObj.put("command", "LOCK_ALLOWED");
 					    outgoingObj.put("username", username);
@@ -339,9 +338,13 @@ public class Control extends Thread {
 			}
 			else {
 			userList.put(username,secret);
+			outgoingObj.put("command", "LOCK_REQUEST");
+			outgoingObj.put("username", username);
+			outgoingObj.put("secret", secret);
 			waitings.add(new WaitingMessage(con,"LOCK_REQUEST",username+secret,serversList.size()));
-			for(int i=0;i<serversList.size();i++)
-			    serversList.get(i).writeMsg(incomingObj.toJSONString());	
+			for(int i=0;i<serversList.size();i++) {
+			    serversList.get(i).writeMsg(outgoingObj.toJSONString());	
+			}
 			}
 		}
 		else {
@@ -399,6 +402,7 @@ public class Control extends Thread {
 			outgoingObj.put("secret", secret);
 			con.writeMsg(outgoingObj.toJSONString());
 		}else {
+			log.info("2");
 			if(serversList.size()==1) {
 				outgoingObj.put("command", "LOCK_ALLOWED");
 				outgoingObj.put("username", username);
