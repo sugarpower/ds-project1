@@ -263,7 +263,7 @@ public class Control extends Thread {
 		
 		if(username.equals("anonymous")) {
 			successLogin = true;
-		}else if(userList.get(username)==secret) {
+		}else if(userList.get(username).equals(secret)) {
 				successLogin = true;
 		}
 		return successLogin;
@@ -379,7 +379,7 @@ public class Control extends Thread {
 		
 		if(username.equals("anonymous")) {
 			successLogin = true;
-		}else if(userList.get(username)==secret) {
+		}else if(userList.get(username).equals(secret)) {
 				successLogin = true;
 		}
 		

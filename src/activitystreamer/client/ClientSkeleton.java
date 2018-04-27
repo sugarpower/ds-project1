@@ -52,10 +52,16 @@ public class ClientSkeleton extends Thread {
 			    outwriter = new PrintWriter(out, true);
 			    JSONObject outcomingObj = new JSONObject();
 			    
-			    if(Settings.getSecret() == null) {
+			    if(Settings.getUsername().equals("anonymous")) {
+			    	outcomingObj.put("command", "LOGIN");
+			    	outcomingObj.put("username", Settings.getUsername());
+			    }
+			    
+			    else if(Settings.getSecret() == null) {
 			    	outcomingObj.put("command", "REGISTER");
 			    	outcomingObj.put("username", Settings.getUsername());
-			    	outcomingObj.put("secret", Settings.nextSecret());
+			    	Settings.setSecret(Settings.nextSecret());
+			    	outcomingObj.put("secret", Settings.getSecret());
 			    	
 			    }else {
 			    	outcomingObj.put("command", "LOGIN");
