@@ -126,6 +126,11 @@ public class ClientSkeleton extends Thread {
 				clientSolution = new ClientSkeleton();
 				log.info("client redirect");
 			}
+		
+			if(command.equals("REGISTER_FAILED") || command.equals("LOGIN_FAILED")) {
+				clientSolution.disconnect();
+				log.info(incomingObj.get("info").toString());
+			}
 			
 		} catch (IOException e) {
 			// TODO Auto-generated catch block

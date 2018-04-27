@@ -142,10 +142,8 @@ public class Control extends Thread {
 					break;
 				case "SERVER_ANNOUNCE":
 					log.info("incoming server announce");
-					
 					remoteList.put(incomingObj.get("hostname").toString()+":"+incomingObj.get("port").toString(), Integer.valueOf(incomingObj.get("load").toString()));
 	
-					
 					log.info("load is "+load);
 					for(int i=0;i< connections.size();i++) {
 						if (i != connections.indexOf(con) && serversList.contains(connections.get(i))) {
@@ -198,30 +196,27 @@ public class Control extends Thread {
 		JSONObject outgoingObj=new JSONObject();
 		String username=(String)incomingObj.get("username");
 		String secret=(String)incomingObj.get("secret");
-		outgoingObj.put("command", "LOCK_DENIED");
-		outgoingObj.put("username", username);
-		outgoingObj.put("secret", secret);
-		con.writeMsg(outgoingObj.toJSONString());
 		
-		for(Connection tempCon : connections) {
-			if(!tempCon.equals(con))
-				tempCon.writeMsg(incomingObj.toJSONString());
-		}
-			
+		if(userList.containsKey(username)&&userList.get(username).equals(secret))
+			userList.remove(username);
+		
 		for(WaitingMessage temp : waitings)
 			if(temp.getKey().equals(username+secret)) {
-				if(connections.contains(temp.getConnection())) {
-					outgoingObj.put("command", "REGISTER_FAILED");
-					outgoingObj.put("info", "register success for"+username);
-				}
-				else {
-				    outgoingObj.put("command", "LOCK_DENIED");
+				if(serversList.contains(temp.getConnection())) {
+					outgoingObj.put("command", "LOCK_DENIED");
 				    outgoingObj.put("username", username);
 				    outgoingObj.put("secret", secret);
 				}
+				else {
+				    outgoingObj.put("command", "REGISTER_FAILED");
+					outgoingObj.put("info", "register success for"+username);
+				}
 				con.writeMsg(outgoingObj.toJSONString());
-				if(userList.containsKey(username)&&userList.get(username).equals(secret))
-					userList.remove(username);
+	
+		      for(Connection tempCon: serversList) {
+			     if(!tempCon.equals(con))
+				     tempCon.writeMsg(outgoingObj.toJSONString());
+		      }
 				waitings.remove(temp);
 				break;
 			}		
@@ -249,10 +244,14 @@ public class Control extends Thread {
 						outgoingObj.put("command", "LOCK_ALLOWED");
 					    outgoingObj.put("username", username);
 					    outgoingObj.put("secret", secret);
+					    userList.put(username,secret);
 					}
 					else {
+						log.info("REGISTER SUCCESS!");
 					    outgoingObj.put("command", "REGISTER_SUCCESS");
 						outgoingObj.put("info", "register success for"+username);
+						load++;
+						redirect(con, incomingObj);
 					}
 					con.writeMsg(outgoingObj.toJSONString());
 					userList.put(username, secret);
@@ -329,29 +328,18 @@ public class Control extends Thread {
 	@SuppressWarnings("unchecked")
 	public static JSONObject register(Connection con, JSONObject incomingObj) {
 		JSONObject outgoingObj = new JSONObject();
-		boolean successRegister = false;
 		String username = (String) incomingObj.get("username");
 		String secret = (String) incomingObj.get("secret");
 		
 		//TODO verify if successRegister
 		if(!userList.containsKey(username)) {
-			successRegister = true;
-		}
-		
-		
-		if(successRegister) {
-			log.info("REGISTER SUCCESS!");
 			userList.put(username,secret);
-			outgoingObj.put("command", "REGISTER_SUCCESS");
-			outgoingObj.put("info", "register success for "+username);
-			
-			JSONObject outgoingObj1 = new JSONObject();
-			outgoingObj1 = loginSuccess(incomingObj);
-			con.writeMsg(outgoingObj1.toJSONString());
-			load++;
-			redirect(con, incomingObj);
-			
-		}else {
+			waitings.add(new WaitingMessage(con,"LOCK_REQUEST",username+secret,serversList.size()-1));
+			for(int i=0;i<serversList.size();i++)
+				if(serversList.get(i)!=con)
+			    serversList.get(i).writeMsg(incomingObj.toJSONString());	
+		}
+		else {
 			outgoingObj.put("command", "REGISTER_FAILED");
 			outgoingObj.put("info", username+" is already registered with the system");
 		}
@@ -411,9 +399,9 @@ public class Control extends Thread {
 				outgoingObj.put("command", "LOCK_ALLOWED");
 				outgoingObj.put("username", username);
 				outgoingObj.put("secret", secret);
+				userList.put(username, secret);
 				con.writeMsg(outgoingObj.toJSONString());
 			}
-			
 			else {
 			waitings.add(new WaitingMessage(con,"LOCK_REQUEST",username+secret,serversList.size()-1));
 			for(int i=0;i<serversList.size();i++)
