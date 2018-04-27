@@ -122,6 +122,7 @@ public class Control extends Thread {
 			}
 			switch(cmd){
 				case "LOGIN":
+					log.info("a client is trying to log in");
 					if(ifLogin(incomingObj)) {
 						load++;
 						outgoingObj = loginSuccess(incomingObj);
@@ -132,9 +133,11 @@ public class Control extends Thread {
 					con.writeMsg(outgoingObj.toJSONString());
 					break;
 				case "REGISTER":
+					log.info("a client is trying to register");
 					register(con, incomingObj);
 					break;
 				case "LOGOUT" :
+					log.info("a client is trying to logout");
 					if(!incomingObj.get("username").toString().equals("anonymous")) {
 						loginList.remove(incomingObj.get("username").toString());
 					}
@@ -144,6 +147,7 @@ public class Control extends Thread {
 					load--;
 					break;
 				case "AUTHENTICATE":
+					log.info("a server is trying to authenticate.");
 					serversList.add(con);
 					if(authenticateFail(incomingObj)) {
 						outgoingObj = authenticateReply(incomingObj);
@@ -154,6 +158,7 @@ public class Control extends Thread {
 					}
 					break;
 				case "AUTHTENTICATION_FAIL":
+					log.info("authentication fail!");
 					serversList.remove(con);
 					control.connectionClosed(con);  //remove connection
 					con.closeCon();
@@ -172,6 +177,7 @@ public class Control extends Thread {
 					break;
 					
 				case "ACTIVITY_MESSAGE":
+					log.info("a client is trying to send activity message");
 					activityMessage(con,incomingObj);
 					break;
 				case "ACTIVITY_BROADCAST":
@@ -246,14 +252,10 @@ public class Control extends Thread {
 	public synchronized static void lockAllowed(Connection con, JSONObject incomingObj) {
 		String username=(String)incomingObj.get("username");
 		String secret=(String)incomingObj.get("secret");
-		log.info("6");
 		for(WaitingMessage temp : waitings) {
-			log.info("5");
 			if(temp.getKey().equals(username+secret)) {
 				temp.setNum();
-				log.info("4");
 				if(temp.compare()) {
-					log.info("3");
 					JSONObject outgoingObj=new JSONObject();
 					if(serversList.contains(temp.getConnection())) {
 						outgoingObj.put("command", "LOCK_ALLOWED");
@@ -262,14 +264,14 @@ public class Control extends Thread {
 					    userList.put(username,secret);
 					}
 					else {
-						log.info("REGISTER SUCCESS!");
+						log.info("register success!");
 					    outgoingObj.put("command", "REGISTER_SUCCESS");
 						outgoingObj.put("info", "register success for "+username);
 						temp.getConnection().writeMsg(outgoingObj.toJSONString());
 						
 						load++;
 						JSONObject loginObj = new JSONObject();
-						log.info("LOGIN SUCCESS!");
+						log.info("login success!");
 						loginObj.put("command", "LOGIN_SUCCESS");
 						loginObj.put("info", "logged in as user "+username);
 						temp.getConnection().writeMsg(loginObj.toJSONString());
@@ -306,7 +308,7 @@ public class Control extends Thread {
 		JSONObject outgoingObj = new JSONObject();
 		String username = (String) incomingObj.get("username");
 		
-		log.info("LOGIN SUCCESS!");
+		log.info("login success!");
 		outgoingObj.put("command", "LOGIN_SUCCESS");
 		outgoingObj.put("info", "logged in as user "+username);
 		loginList.add(username);
@@ -335,7 +337,7 @@ public class Control extends Thread {
 			log.info("remote load is "+remoteList.get(key));
 			log.info("load is "+load);
 			if(remoteList.get(key).intValue() < load - 1) {
-				log.info("REDIRECT!");
+				log.info("redirect!");
 				if(!incomingObj.get("username").toString().equals("anonymous")) {
 					loginList.remove(incomingObj.get("username").toString());
 				}
@@ -365,14 +367,14 @@ public class Control extends Thread {
 		//TODO verify if successRegister
 		else if(!userList.containsKey(username)) {
 			if (serversList.size()==0) {
-				log.info("REGISTER SUCCESS!");
+				log.info("register success!");
 			    outgoingObj.put("command", "REGISTER_SUCCESS");
 				outgoingObj.put("info", "register success for"+username);
 				con.writeMsg(outgoingObj.toJSONString());
 				loginList.add(username);
 				load++;
 				JSONObject loginObj = new JSONObject();
-				log.info("LOGIN SUCCESS!");
+				log.info("login success!");
 				loginObj.put("command", "LOGIN_SUCCESS");
 				loginObj.put("info", "logged in as user "+username);
 				con.writeMsg(loginObj.toJSONString());
@@ -457,13 +459,11 @@ public class Control extends Thread {
 			con.writeMsg(outgoingObj.toJSONString());
 		}else {
 			if(serversList.size()==1) {
-				log.info("2");
 				outgoingObj.put("command", "LOCK_ALLOWED");
 				outgoingObj.put("username", username);
 				outgoingObj.put("secret", secret);
 				userList.put(username, secret);
 				con.writeMsg(outgoingObj.toJSONString());
-				log.info("7");
 			}
 			else {
 			waitings.add(new WaitingMessage(con,"LOCK_REQUEST",username+secret,serversList.size()-1));
