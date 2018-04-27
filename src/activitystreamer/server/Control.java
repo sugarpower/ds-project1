@@ -115,6 +115,11 @@ public class Control extends Thread {
 		
 		if(incomingObj.containsKey("command")) {
 			String cmd = (String) incomingObj.get("command");
+			log.info(cmd);
+			if(incomingObj.containsKey("info")) {
+				String info = (String) incomingObj.get("info");
+				log.info(info);
+			}
 			switch(cmd){
 				case "LOGIN":
 					if(ifLogin(incomingObj)) {
@@ -182,7 +187,7 @@ public class Control extends Thread {
 				case "LOCK_ALLOWED":
 					lockAllowed(con,incomingObj);
 					break;
-				case "LOCK_DENY":
+				case "LOCK_DENIED":
 					lockDenied(con,incomingObj);
 					break;
 				default:
@@ -190,6 +195,11 @@ public class Control extends Thread {
 					outgoingObj.put( "command", "INVALID_MESSAGE");
 					outgoingObj.put( "info", "No command "+cmd);
 					con.writeMsg(outgoingObj.toJSONString());
+					if(serversList.contains(con)) {
+						serversList.remove(con);}
+					control.connectionClosed(con);  //remove connection
+					con.closeCon();
+					break;
 		}
 		} else {
 			outgoingObj = new JSONObject();
@@ -262,7 +272,7 @@ public class Control extends Thread {
 						log.info("LOGIN SUCCESS!");
 						loginObj.put("command", "LOGIN_SUCCESS");
 						loginObj.put("info", "logged in as user "+username);
-						con.writeMsg(loginObj.toJSONString());
+						temp.getConnection().writeMsg(loginObj.toJSONString());
 						userList.put(username, secret);
 						log.info("falg master");
 						redirect(temp.getConnection(), incomingObj);
