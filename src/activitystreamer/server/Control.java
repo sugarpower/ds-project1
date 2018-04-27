@@ -13,6 +13,7 @@ import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
 import activitystreamer.util.Settings;
+import activitystreamer.util.WaitingMessage;
 
 public class Control extends Thread {
 	private static final Logger log = LogManager.getLogger();
@@ -27,6 +28,7 @@ public class Control extends Thread {
 	private static String localhost = Settings.getLocalHostname();
 	private static int localport = Settings.getLocalPort();
 	private static int load = 0;
+	private static ArrayList<WaitingMessage> waitings;//
 	private JSONParser parser = new JSONParser();
 	
 	
@@ -45,6 +47,7 @@ public class Control extends Thread {
 		userList = new HashMap<String, String>();
 		remoteList = new HashMap<String, Integer>();
 		serversList = new ArrayList<Connection>();
+		 waitings= new  ArrayList<WaitingMessage>();
 		
 		// start a listener
 		try {
@@ -167,8 +170,13 @@ public class Control extends Thread {
 						}
 					}
 				case "LOCK_REQUEST":
-					outgoingObj = lockReply(incomingObj);
-					con.writeMsg(outgoingObj.toJSONString());
+					lockReply(con,incomingObj);
+					break;
+				case "LOCK_ALLOWED"://
+					lockAllowed(con,incomingObj);
+					break;
+				case "LOCK_DENY"://
+					lockDenied(con,incomingObj);
 					break;
 				default:
 					outgoingObj = new JSONObject();
@@ -185,8 +193,75 @@ public class Control extends Thread {
 		}
 		
 		}
+	@SuppressWarnings("unchecked")
+	public synchronized static void lockDenied(Connection con, JSONObject incomingObj) {
+		JSONObject outgoingObj=new JSONObject();
+		String username=(String)incomingObj.get("username");
+		String secret=(String)incomingObj.get("secret");
+		outgoingObj.put("command", "LOCK_DENIED");
+		outgoingObj.put("username", username);
+		outgoingObj.put("secret", secret);
+		con.writeMsg(outgoingObj.toJSONString());
 		
-	
+		for(Connection tempCon : connections) {
+			if(!tempCon.equals(con))
+				tempCon.writeMsg(incomingObj.toJSONString());
+		}
+			
+		for(WaitingMessage temp : waitings)
+			if(temp.getKey().equals(username+secret)) {
+				if(connections.contains(temp.getConnection())) {
+					outgoingObj.put("command", "REGISTER_FAILED");
+					outgoingObj.put("info", "register success for"+username);
+				}
+				else {
+				    outgoingObj.put("command", "LOCK_DENIED");
+				    outgoingObj.put("username", username);
+				    outgoingObj.put("secret", secret);
+				}
+				con.writeMsg(outgoingObj.toJSONString());
+				if(userList.containsKey(username)&&userList.get(username).equals(secret))
+					userList.remove(username);
+				waitings.remove(temp);
+				break;
+			}		
+	}
+
+	//
+	@SuppressWarnings("unchecked")
+	public synchronized static void lockAllowed(Connection con, JSONObject incomingObj) {
+		String username=(String)incomingObj.get("username");
+		String secret=(String)incomingObj.get("secret");
+		
+		for(Connection tempCon : connections) {
+			if(!tempCon.equals(con))
+				tempCon.writeMsg(incomingObj.toJSONString());
+		}
+		
+		for(WaitingMessage temp : waitings) 
+			if(temp.getKey().equals(username+secret)) {
+				temp.setRecieve(incomingObj.toJSONString());
+				temp.setNum();
+				if(temp.compare()) {
+					JSONObject outgoingObj=new JSONObject();
+					
+					if(serversList.contains(temp.getConnection())) {
+						outgoingObj.put("command", "LOCK_ALLOWED");
+					    outgoingObj.put("username", username);
+					    outgoingObj.put("secret", secret);
+					}
+					else {
+					    outgoingObj.put("command", "REGISTER_SUCCESS");
+						outgoingObj.put("info", "register success for"+username);
+					}
+					con.writeMsg(outgoingObj.toJSONString());
+					userList.put(username, secret);
+					waitings.remove(temp);
+					break;
+				}
+			}
+	}
+
 	//zhenyuan&xueyang
 	
 	public static boolean ifLogin(JSONObject incomingObj) {
@@ -201,8 +276,6 @@ public class Control extends Thread {
 		}
 		return successLogin;
 	}
-	
-	
 	
 	//zhenyuan
 	@SuppressWarnings("unchecked")
@@ -286,18 +359,6 @@ public class Control extends Thread {
 		return outgoingObj;
 	}
 	//zhenyuan
-	
-	@SuppressWarnings("unchecked")
-	public static JSONObject lockRequest(JSONObject incomingObj) {
-		JSONObject outgoingObj = new JSONObject();
-		String username = (String) incomingObj.get("username");
-		String secret = (String) incomingObj.get("secret");
-		outgoingObj.put( "command" , "LOCK_REQUEST");
-		outgoingObj.put("username", username);
-		outgoingObj.put("secret", secret);
-		return outgoingObj;
-	}
-	
 
 	public static boolean authenticateFail(JSONObject incomingObj) {
 		String secret = (String) incomingObj.get("secret");
@@ -335,20 +396,31 @@ public class Control extends Thread {
 	}
 
 	@SuppressWarnings("unchecked")
-	public static JSONObject lockReply(JSONObject incomingObj) {
+	public static void lockReply(Connection con, JSONObject incomingObj) {
 		JSONObject outgoingObj = new JSONObject();
 		String username = (String) incomingObj.get("username");
 		String secret = (String) incomingObj.get("secret");
 		
 		if(userList.containsKey(username)){
 			outgoingObj.put("command", "LOCK_DENIED");
+			outgoingObj.put("username", username);
+			outgoingObj.put("secret", secret);
+			con.writeMsg(outgoingObj.toJSONString());
 		}else {
-			outgoingObj.put("command", "ALLOWED");
-			userList.put(username,secret);
+			if(serversList.size()==1) {
+				outgoingObj.put("command", "LOCK_ALLOWED");
+				outgoingObj.put("username", username);
+				outgoingObj.put("secret", secret);
+				con.writeMsg(outgoingObj.toJSONString());
+			}
+			
+			else {
+			waitings.add(new WaitingMessage(con,"LOCK_REQUEST",username+secret,serversList.size()-1));
+			for(int i=0;i<serversList.size();i++)
+				if(serversList.get(i)!=con)
+			    serversList.get(i).writeMsg(incomingObj.toJSONString());	
+			}
 		}
-		outgoingObj.put("username", username);
-		outgoingObj.put("secret", secret);
-		return outgoingObj;
 	}
 	
 	
