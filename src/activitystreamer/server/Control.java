@@ -228,11 +228,6 @@ public class Control extends Thread {
 		String username=(String)incomingObj.get("username");
 		String secret=(String)incomingObj.get("secret");
 		
-		for(Connection tempCon : connections) {
-			if(!tempCon.equals(con))
-				tempCon.writeMsg(incomingObj.toJSONString());
-		}
-		
 		for(WaitingMessage temp : waitings) 
 			if(temp.getKey().equals(username+secret)) {
 				temp.setRecieve(incomingObj.toJSONString());
@@ -331,12 +326,14 @@ public class Control extends Thread {
 		String username = (String) incomingObj.get("username");
 		String secret = (String) incomingObj.get("secret");
 		
+		if(username.equals("anonymous"))
+			redirect(con,incomingObj);
+          
 		//TODO verify if successRegister
 		if(!userList.containsKey(username)) {
 			userList.put(username,secret);
-			waitings.add(new WaitingMessage(con,"LOCK_REQUEST",username+secret,serversList.size()-1));
+			waitings.add(new WaitingMessage(con,"LOCK_REQUEST",username+secret,serversList.size()));
 			for(int i=0;i<serversList.size();i++)
-				if(serversList.get(i)!=con)
 			    serversList.get(i).writeMsg(incomingObj.toJSONString());	
 		}
 		else {
