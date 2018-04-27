@@ -211,7 +211,7 @@ public class Control extends Thread {
 				    outgoingObj.put("command", "REGISTER_FAILED");
 					outgoingObj.put("info", "register success for"+username);
 				}
-				con.writeMsg(outgoingObj.toJSONString());
+				temp.getConnection().writeMsg(outgoingObj.toJSONString());
 	
 		      for(Connection tempCon: serversList) {
 			     if(!tempCon.equals(con))
@@ -246,9 +246,9 @@ public class Control extends Thread {
 					    outgoingObj.put("command", "REGISTER_SUCCESS");
 						outgoingObj.put("info", "register success for"+username);
 						load++;
-						redirect(con, incomingObj);
+						redirect(temp.getConnection(), incomingObj);
 					}
-					con.writeMsg(outgoingObj.toJSONString());
+					temp.getConnection().writeMsg(outgoingObj.toJSONString());
 					userList.put(username, secret);
 					waitings.remove(temp);
 					break;
