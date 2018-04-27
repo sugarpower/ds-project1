@@ -117,8 +117,7 @@ public class Control extends Thread {
 					load++;
 					break;
 				case "REGISTER":
-					outgoingObj = register(con, incomingObj);
-					con.writeMsg(outgoingObj.toJSONString());
+					register(con, incomingObj);
 					break;
 				case "LOGOUT" :
 					//TODO remove it from loginList
@@ -244,12 +243,12 @@ public class Control extends Thread {
 					else {
 						log.info("REGISTER SUCCESS!");
 					    outgoingObj.put("command", "REGISTER_SUCCESS");
-						outgoingObj.put("info", "register success for"+username);
+						outgoingObj.put("info", "register success for "+username);
 						load++;
+						temp.getConnection().writeMsg(outgoingObj.toJSONString());
+						userList.put(username, secret);
 						redirect(temp.getConnection(), incomingObj);
 					}
-					temp.getConnection().writeMsg(outgoingObj.toJSONString());
-					userList.put(username, secret);
 					waitings.remove(temp);
 					break;
 				}
@@ -321,7 +320,7 @@ public class Control extends Thread {
 	
 	//zhenyuan
 	@SuppressWarnings("unchecked")
-	public static JSONObject register(Connection con, JSONObject incomingObj) {
+	public static void register(Connection con, JSONObject incomingObj) {
 		JSONObject outgoingObj = new JSONObject();
 		String username = (String) incomingObj.get("username");
 		String secret = (String) incomingObj.get("secret");
@@ -330,18 +329,26 @@ public class Control extends Thread {
 			redirect(con,incomingObj);
           
 		//TODO verify if successRegister
-		if(!userList.containsKey(username)) {
+		else if(!userList.containsKey(username)) {
+			if (serversList.size()==0) {
+				log.info("REGISTER SUCCESS!");
+			    outgoingObj.put("command", "REGISTER_SUCCESS");
+				outgoingObj.put("info", "register success for"+username);
+				load++;
+				con.writeMsg(outgoingObj.toJSONString());
+			}
+			else {
 			userList.put(username,secret);
 			waitings.add(new WaitingMessage(con,"LOCK_REQUEST",username+secret,serversList.size()));
 			for(int i=0;i<serversList.size();i++)
 			    serversList.get(i).writeMsg(incomingObj.toJSONString());	
+			}
 		}
 		else {
 			outgoingObj.put("command", "REGISTER_FAILED");
 			outgoingObj.put("info", username+" is already registered with the system");
+			con.writeMsg(outgoingObj.toJSONString());
 		}
-		
-		return outgoingObj;
 	}
 	//zhenyuan
 

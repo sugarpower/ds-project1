@@ -84,6 +84,10 @@ public class Connection extends Thread {
 		return socket;
 	}
 	
+	public boolean equals(Connection con) {
+		return con.getSocket()==socket;
+	}
+	
 	public boolean isOpen() {
 		return open;
 	}
