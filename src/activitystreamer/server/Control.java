@@ -465,9 +465,9 @@ public class Control extends Thread {
 			activityObj.put("authenticate_user", username);
 			outgoingObj.put("activity", activityObj);
 			for (int i = 0; i < connections.size(); i++) {
-				if (i != connections.indexOf(con)) {
+				//if (i != connections.indexOf(con)) {
 					connections.get(i).writeMsg(outgoingObj.toJSONString());
-				}
+				//}
 			}
 		} else {
 			outgoingObj.put("command", "AUTHENTICATION_FAIL");
