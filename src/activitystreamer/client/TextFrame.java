@@ -96,12 +96,16 @@ public class TextFrame extends JFrame implements ActionListener {
 			JSONObject obj;
 			try {
 				obj = (JSONObject) parser.parse(msg);
-				obj.put("username", Settings.getUsername());
+				
+				JSONObject outgoingObj = new JSONObject();
 				if(Settings.getSecret()!=null) {
-					obj.put("secret", Settings.getSecret());
+					outgoingObj.put("secret", Settings.getSecret());
 				}
-				obj.put("command", "ACTIVITY_MESSAGE");
-				ClientSkeleton.getInstance().sendActivityObject(obj);
+				outgoingObj.put("username", Settings.getUsername());
+				outgoingObj.put("command", "ACTIVITY_MESSAGE"); 
+				outgoingObj.put("activity", obj);
+				
+				ClientSkeleton.getInstance().sendActivityObject(outgoingObj);
 			} catch (ParseException e1) {
 				log.error("invalid JSON object entered into input text field, data not sent");
 			}

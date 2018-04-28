@@ -99,7 +99,7 @@ public class Control extends Thread {
 			log.error("invalid JSON object");
 			JSONObject outgoingObj = new JSONObject();
 			outgoingObj.put("command", "INVALID_MESSAGE");
-			outgoingObj.put("command", "JSON parse error while parsing message");
+			outgoingObj.put("info", "JSON parse error while parsing message");
 			con.writeMsg(outgoingObj.toJSONString());
 			control.connectionClosed(con);
 			con.closeCon();
@@ -420,7 +420,7 @@ public class Control extends Thread {
 		boolean successLogin = false;
 		String username = (String) incomingObj.get("username");
 		String secret = (String) incomingObj.get("secret");
-		String activity = (String) incomingObj.get("activity");
+		//String activity = (String) incomingObj.get("activity");
 		
 		if(username.equals("anonymous")) {
 			successLogin = true;
@@ -430,7 +430,7 @@ public class Control extends Thread {
 		
 		if(successLogin) {
 			outgoingObj.put("command", "ACTIVITY_BROADCAST");
-			outgoingObj.put("activity", activity);
+			outgoingObj.put("activity", incomingObj.get("activity"));
 			for(int i=0;i< connections.size();i++) {
 				if (i != connections.indexOf(con)) {
 				connections.get(i).writeMsg(outgoingObj.toJSONString());
