@@ -458,7 +458,12 @@ public class Control extends Thread {
 
 		if (successLogin) {
 			outgoingObj.put("command", "ACTIVITY_BROADCAST");
-			outgoingObj.put("activity", incomingObj.get("activity"));
+			JSONObject activityObj = (JSONObject) incomingObj.get("activity");
+			if(activityObj.containsKey("authenticate_user")) {
+				activityObj.remove("authenticate_user");
+			}
+			activityObj.put("authenticate_user", username);
+			outgoingObj.put("activity", activityObj);
 			for (int i = 0; i < connections.size(); i++) {
 				if (i != connections.indexOf(con)) {
 					connections.get(i).writeMsg(outgoingObj.toJSONString());
