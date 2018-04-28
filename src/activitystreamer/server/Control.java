@@ -459,8 +459,8 @@ public class Control extends Thread {
 		if (successLogin) {
 			outgoingObj.put("command", "ACTIVITY_BROADCAST");
 			JSONObject activityObj = (JSONObject) incomingObj.get("activity");
-			if(activityObj.containsKey("authenticate_user")) {
-				activityObj.remove("authenticate_user");
+			if(activityObj.containsKey("authenticated_user")) {
+				activityObj.remove("authenticated_user");
 			}
 			activityObj.put("authenticate_user", username);
 			outgoingObj.put("activity", activityObj);
