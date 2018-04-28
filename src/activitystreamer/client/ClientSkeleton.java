@@ -130,18 +130,22 @@ public class ClientSkeleton extends Thread {
 				Settings.setRemoteHostname(incomingObj.get("hostname").toString());
 				Settings.setRemotePort(Integer.parseInt(incomingObj.get("port").toString()));
 				clientSolution.disconnect();
-				log.info("client redirect");
+				log.info("\nclient redirect\n");
 				clientSolution = new ClientSkeleton();
 			}
 			
 			if(command.equals("REGISTER_SUCCESS")) {
-				log.info("register success");
+				log.info("\n\nregister success\n");
 				JSONObject outcomingObj= new JSONObject();
 				outcomingObj.put("command", "LOGIN");
 		    	outcomingObj.put("username", Settings.getUsername());
 		    	outcomingObj.put("secret", Settings.getSecret());
 		    	outwriter.println(outcomingObj.toJSONString());
 				outwriter.flush(); 
+			}
+			
+			if(command.equals("LOGIN_SUCCESS")) {
+				log.info("\n\nlogin success\n");
 			}
 		
 			if(command.equals("REGISTER_FAILED") || command.equals("LOGIN_FAILED") || command.equals("AUTHENTICATION_FAIL")) {

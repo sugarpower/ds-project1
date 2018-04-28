@@ -83,7 +83,7 @@ public class Control extends Thread {
 			}
 		} else {
 			serverSecret = Settings.nextSecret();
-			log.info("server secret is: " + serverSecret);
+			log.info("\n\nserver secret is: " + serverSecret+"\nuse this secret to launch other servers\n");
 		}
 	}
 
@@ -117,14 +117,9 @@ public class Control extends Thread {
 
 		if (incomingObj.containsKey("command")) {
 			String cmd = (String) incomingObj.get("command");
-			log.info(cmd);
-			if (incomingObj.containsKey("info")) {
-				String info = (String) incomingObj.get("info");
-				log.info(info);
-			}
 			switch (cmd) {
 			case "LOGIN":
-				log.info("a client is trying to log in");
+				log.info("\n\na client is trying to log in\n");
 				if (ifLogin(incomingObj)) {
 					//log.info("1");
 					load++;
@@ -139,11 +134,11 @@ public class Control extends Thread {
 				con.writeMsg(outgoingObj.toJSONString());
 				break;
 			case "REGISTER":
-				log.info("a client is trying to register");
+				log.info("\n\na client is trying to register\n");
 				register(con, incomingObj);
 				break;
 			case "LOGOUT":
-				log.info("a client is trying to logout");
+				log.info("\n\na client is trying to logout\n");
 				/**
 				 * if(!incomingObj.get("username").toString().equals("anonymous")) {
 				 * loginList.remove(incomingObj.get("username").toString()); }
@@ -153,7 +148,7 @@ public class Control extends Thread {
 				load--;
 				break;
 			case "AUTHENTICATE":
-				log.info("a server is trying to authenticate.");
+				log.info("\n\na server is trying to authenticate\n");
 				serversList.add(con);
 				if (authenticateFail(incomingObj)) {
 					outgoingObj = authenticateReply(incomingObj);
@@ -164,20 +159,21 @@ public class Control extends Thread {
 				}
 				break;
 			case "AUTHTENTICATION_FAIL":
-				log.info("authentication fail!");
+				log.info("\n\nauthentication fail!\n");
 				serversList.remove(con);
 				control.connectionClosed(con); // remove connection
 				con.closeCon();
 				break;
 			case "SERVER_ANNOUNCE":
-				log.info("incoming server announce");
-
-				remoteList.put(
-						incomingObj.get("hostname").toString() + ":"
-								+ incomingObj.get("port").toString(),
-						Integer.valueOf(incomingObj.get("load").toString()));
-
-				log.info("load is " + load);
+				
+				String incomingHostname = incomingObj.get("hostname").toString();
+				String incomingPort =incomingObj.get("port").toString();
+				String incomingLoad = incomingObj.get("load").toString();
+				remoteList.put(incomingHostname + ":"+ incomingPort, Integer.valueOf(incomingLoad));
+				
+				log.info("\n\nincoming server announce: \nhostname of incoming server is "+ incomingHostname +
+						 "\nport of incoming server is "+incomingPort+"\nload of incoming server is "+incomingLoad+"\n");
+				
 				for (int i = 0; i < connections.size(); i++) {
 					if (i != connections.indexOf(con)
 							&& serversList.contains(connections.get(i))) {
@@ -188,7 +184,7 @@ public class Control extends Thread {
 				break;
 
 			case "ACTIVITY_MESSAGE":
-				log.info("a client is trying to send activity message");
+				log.info("\n\na client is trying to send activity message\n");
 				activityMessage(con, incomingObj);
 				break;
 			case "ACTIVITY_BROADCAST":
@@ -223,8 +219,7 @@ public class Control extends Thread {
 		} else {
 			outgoingObj = new JSONObject();
 			outgoingObj.put("command", "INVALID_MESSAGE");
-			outgoingObj.put("info",
-					"the received message did not contain a command");
+			outgoingObj.put("info", "the received message did not contain a command");
 			con.writeMsg(outgoingObj.toJSONString());
 
 		}
@@ -280,16 +275,14 @@ public class Control extends Thread {
 						outgoingObj.put("secret", secret);
 						userList.put(username, secret);
 					} else {
-						log.info("register success!");
+						log.info("\n\nregister success!\n");
 						outgoingObj.put("command", "REGISTER_SUCCESS");
 						outgoingObj.put("info",
 								"register success for " + username);
 						temp.getConnection()
 								.writeMsg(outgoingObj.toJSONString());
-
-						load++;
 						JSONObject loginObj = new JSONObject();
-						log.info("login success!");
+						log.info("\n\nlogin success!\n");
 						loginObj.put("command", "LOGIN_SUCCESS");
 						loginObj.put("info", "logged in as user " + username);
 						temp.getConnection().writeMsg(loginObj.toJSONString());
@@ -314,7 +307,6 @@ public class Control extends Thread {
 		if (username.equals("anonymous")) {
 			successLogin = true;
 		} else if (userList.containsKey(username)) {
-			log.info("there is "+ username);
 			if (userList.get(username).equals(secret)) {
 			successLogin = true;
 			}
@@ -329,7 +321,7 @@ public class Control extends Thread {
 		JSONObject outgoingObj = new JSONObject();
 		String username = (String) incomingObj.get("username");
 
-		log.info("login success!");
+		log.info("\n\nlogin success!\n");
 		outgoingObj.put("command", "LOGIN_SUCCESS");
 		outgoingObj.put("info", "logged in as user " + username);
 		//loginList.add(username);
@@ -359,10 +351,10 @@ public class Control extends Thread {
 			log.info("load is " + load);
 			if (remoteList.get(key).intValue() < load - 1) {
 				log.info("redirect!");
-				if (!incomingObj.get("username").toString()
-						.equals("anonymous")) {
+				//if (!incomingObj.get("username").toString()
+				//		.equals("anonymous")) {
 					//loginList.remove(incomingObj.get("username").toString());
-				}
+				//}
 				outgoingObj.put("command", "REDIRECT");
 				outgoingObj.put("hostname",
 						key.substring(0, key.indexOf(":")));
@@ -395,7 +387,7 @@ public class Control extends Thread {
 		if (!userList.containsKey(username)) {
 			if (serversList.size() == 0) {
 				userList.put(username, secret);
-				log.info("register success!");
+				log.info("\n\nregister success!\n");
 				outgoingObj.put("command", "REGISTER_SUCCESS");
 				outgoingObj.put("info", "register success for" + username);
 				con.writeMsg(outgoingObj.toJSONString());
@@ -521,7 +513,7 @@ public class Control extends Thread {
 	 */
 	public synchronized Connection incomingConnection(Socket s)
 			throws IOException {
-		log.debug("incomming connection: " + Settings.socketAddress(s));
+		log.debug("\n\nincomming connection: " + Settings.socketAddress(s)+"\n");
 		Connection c = new Connection(s);
 		connections.add(c);
 		return c;
@@ -534,7 +526,7 @@ public class Control extends Thread {
 	 */
 	public synchronized Connection outgoingConnection(Socket s)
 			throws IOException {
-		log.debug("outgoing connection: " + Settings.socketAddress(s));
+		log.debug("\n\noutgoing connection: " + Settings.socketAddress(s)+"\n");
 		Connection c = new Connection(s);
 		connections.add(c);
 		return c;
@@ -544,8 +536,8 @@ public class Control extends Thread {
 	@SuppressWarnings("unchecked")
 	@Override
 	public void run() {
-		log.info("using activity interval of " + Settings.getActivityInterval()
-				+ " milliseconds");
+		log.info("\n\nusing activity interval of " + Settings.getActivityInterval()
+				+ " milliseconds\n");
 		while (!term) {
 			// do something with 5 second intervals in between
 
@@ -559,7 +551,8 @@ public class Control extends Thread {
 			for (int i = 0; i < connections.size(); i++) {
 				if (serversList.contains(connections.get(i))) {
 					connections.get(i).writeMsg(outgoingObj.toJSONString());
-					log.info("outgoing server announce");
+					log.info("\n\noutgoing server announce: \nhostname of this server is "+ Settings.getLocalHostname() +
+							 "\nport of this server is "+Settings.getLocalPort()+"\nload of this server is "+load+"\n");
 				}
 			}
 			// zhenyuan
@@ -567,16 +560,16 @@ public class Control extends Thread {
 			try {
 				Thread.sleep(Settings.getActivityInterval());
 			} catch (InterruptedException e) {
-				log.info("received an interrupt, system is shutting down");
+				log.info("\n\nreceived an interrupt, system is shutting down\n");
 				break;
 			}
 			if (!term) {
-				log.debug("doing activity");
+
 				term = doActivity();
 			}
 
 		}
-		log.info("closing " + connections.size() + " connections");
+		log.info("\nclosing " + connections.size() + " connections");
 		// clean up
 		for (Connection connection : connections) {
 			connection.closeCon();
