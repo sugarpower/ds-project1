@@ -88,12 +88,12 @@ public class ClientSkeleton extends Thread {
 	
 	public void sendActivityObject(JSONObject activityObj){
 		//Zhenyuan
-		outwriter.println(activityObj.toString());
-		outwriter.flush(); 
-		if (activityObj.containsValue("LOGOUT")) {
-			ClientSkeleton.getInstance().disconnect();		//Xueyang
+		if(activityObj.get("command").equals("LOGOUT")) {
+			term = true;
+			log.info("log out");
 		}
-		
+		outwriter.println(activityObj.toJSONString());
+		outwriter.flush(); 
 		//Zhenyuan
 	}
 	
@@ -133,11 +133,23 @@ public class ClientSkeleton extends Thread {
 				log.info("client redirect");
 				clientSolution = new ClientSkeleton();
 			}
+			
+			if(command.equals("REGISTER_SUCCESS")) {
+				log.info("register success");
+				JSONObject outcomingObj= new JSONObject();
+				outcomingObj.put("command", "LOGIN");
+		    	outcomingObj.put("username", Settings.getUsername());
+		    	outcomingObj.put("secret", Settings.getSecret());
+		    	outwriter.println(outcomingObj.toJSONString());
+				outwriter.flush(); 
+			}
 		
 			if(command.equals("REGISTER_FAILED") || command.equals("LOGIN_FAILED") || command.equals("AUTHENTICATION_FAIL")) {
 				clientSolution.disconnect();
 				log.info(incomingObj.get("info").toString());
 			}
+			
+		} catch (NullPointerException e) {
 			
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
@@ -145,7 +157,7 @@ public class ClientSkeleton extends Thread {
 		} catch (ParseException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-		}
+		} 
 		
 		}
 	}

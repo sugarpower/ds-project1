@@ -111,6 +111,9 @@ public class TextFrame extends JFrame implements ActionListener {
 			}
 			
 		} else if(e.getSource()==disconnectButton){
+			JSONObject outgoingObj = new JSONObject();
+			outgoingObj.put("command","LOGOUT");
+			ClientSkeleton.getInstance().sendActivityObject(outgoingObj);
 			ClientSkeleton.getInstance().disconnect();
 		}
 	}
