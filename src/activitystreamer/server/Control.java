@@ -663,6 +663,13 @@ public class Control extends Thread {
 				
 			}
 			
+			if(sequenceList.size() !=0) {
+				for(String key : sequenceList.keySet()) {
+					checkRemoteList.put(key, sequenceList.get(key));
+				}
+			}
+			
+			
 			Integer minSequence = Settings.getSequence();
 			String address = Settings.getLocalHostname()+":"+Settings.getLocalPort();
 			
