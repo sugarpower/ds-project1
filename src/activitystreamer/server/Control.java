@@ -25,6 +25,7 @@ public class Control extends Thread {
 	private static ArrayList<Connection> serversList;
 	private static Map<String, Integer> checkRemoteList;
 	private static Map<String, Integer> sequenceList;
+	private static Map<String, Integer> sequenceList0;
 	private static String serverSecret = Settings.getSecret();
 	private static String id = Settings.nextSecret();
 	private static String localhost = Settings.getLocalHostname();
@@ -52,6 +53,7 @@ public class Control extends Thread {
 		waitings = new ArrayList<WaitingMessage>();
 		checkRemoteList = new HashMap<String, Integer>();
 		sequenceList = new HashMap<String, Integer>();
+		sequenceList0 = new HashMap<String, Integer>();
 		
 
 		// start a listener
@@ -665,7 +667,7 @@ public class Control extends Thread {
 			String address = Settings.getLocalHostname()+":"+Settings.getLocalPort();
 			
 			//TODO: check the judgment of this if clause.
-			if( checkRemoteList.size() !=0 && !sequenceList.containsValue(0)) {
+			if( checkRemoteList.size() !=0 && !sequenceList.containsValue(0) && sequenceList0.equals(sequenceList)) {
 				
 				boolean reconnect = false;
 				
@@ -777,7 +779,7 @@ public class Control extends Thread {
 				}
 			}
 			
-			checkRemoteList = sequenceList; sequenceList = new HashMap<String, Integer>();
+			sequenceList0 = sequenceList; sequenceList = new HashMap<String, Integer>();
 			
 			try {
 				Thread.sleep(Settings.getActivityInterval());
