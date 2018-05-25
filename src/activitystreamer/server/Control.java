@@ -5,6 +5,7 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -808,6 +809,38 @@ public class Control extends Thread {
 			}
 			
 			sequenceList0 = sequenceList; sequenceList = new HashMap<String, Integer>();
+			
+			if(serversList.size() == 0 && sequenceList.isEmpty() && Settings.getSequence() != 0) {
+				initiateConnection();
+			}
+			
+			
+			if(serversList.size() == 0 && sequenceList.isEmpty() && Settings.getSequence() == 0 && remoteList.size() !=0 ) {
+				Random rnd = new Random();
+			    int randomNum = rnd.nextInt(remoteList.size());
+			    ArrayList<String> keys = new ArrayList<String>(remoteList.keySet());
+			    String rndKey = keys.get(randomNum);
+				Settings.setRemoteHostname(rndKey.substring(0, rndKey.indexOf(":")));
+				Settings.setRemotePort(Integer.parseInt(rndKey.substring(rndKey.indexOf(":") + 1)));
+				try {
+					Connection c = outgoingConnection(new Socket(Settings.getRemoteHostname(),
+							Settings.getRemotePort()));
+			
+					//TODO: check
+					JSONObject authenticateObj1 = new JSONObject();
+					authenticateObj1.put("command", "AUTHENTICATE");
+					authenticateObj1.put("secret", serverSecret);
+					c.writeMsg(authenticateObj1.toJSONString());
+					serversList.add(c);
+					checkRemoteList = new HashMap<String, Integer>();
+
+
+				} catch (IOException e) {
+					log.error("failed to make connection to "
+							+ Settings.getRemoteHostname() + ":"
+							+ Settings.getRemotePort() + " :" + e);
+				}
+			}
 			
 			try {
 				Thread.sleep(Settings.getActivityInterval());
