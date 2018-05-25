@@ -625,6 +625,7 @@ public class Control extends Thread {
 			outgoingObj.put("load", load);
 			outgoingObj.put("hostname", localhost);
 			outgoingObj.put("port", localport);
+			outgoingObj.put("sequence", Settings.getSequence());
 			for (int i = 0; i < connections.size(); i++) {
 				if (serversList.contains(connections.get(i))) {
 					connections.get(i).writeMsg(outgoingObj.toJSONString());
@@ -660,18 +661,14 @@ public class Control extends Thread {
 				
 			}
 			
-			/*
-			for (String key : checkRemoteList.keySet()) {
-				if( ! sequenceList.containsKey(key)) {
-					log.info("server "+key+" crashed or disconnected");
-				}
-			}
-			*/
-			
 			Integer minSequence = Settings.getSequence();
+			String address = Settings.getLocalHostname()+":"+Settings.getLocalPort();
 			
 			//TODO: check the judgment of this if clause.
 			if( checkRemoteList.size() !=0 && !sequenceList.containsValue(0)) {
+				
+				boolean reconnect = false;
+				
 				for (String key : sequenceList.keySet()) {
 					if(minSequence < sequenceList.get(key)) {
 						minSequence = sequenceList.get(key);
@@ -682,7 +679,7 @@ public class Control extends Thread {
 					if(Settings.getSequence() != 1) {
 
 						for(String key : checkRemoteList.keySet()) {
-							if(!key.equals(Settings.getRemoteHostname()+":"+Settings.getRemotePort())
+							if(!reconnect && !key.equals(Settings.getRemoteHostname()+":"+Settings.getRemotePort())
 									&& checkRemoteList.get(key) == minSequence - 1 )  {
 									//redirect to this server
 								
@@ -697,26 +694,86 @@ public class Control extends Thread {
 									authenticateObj.put("secret", serverSecret);
 									c.writeMsg(authenticateObj.toJSONString());
 									serversList.add(c);
+									reconnect = true;
 
 
 								} catch (IOException e) {
 									log.error("failed to make connection to "
 											+ Settings.getRemoteHostname() + ":"
 											+ Settings.getRemotePort() + " :" + e);
-									System.exit(-1);
+									
 								}
 							}					
 						
 						}
 						
-						for(String key : checkRemoteList.keySet()) {
-							if(checkRemoteList.get(key) == minSequence - 2) {
-								//redirect to this server
+						if(!reconnect) {
+							for(String key : checkRemoteList.keySet()) {
+								if(!reconnect && checkRemoteList.get(key) == minSequence - 2) {
+									//redirect to this server
+									
+									Settings.setRemoteHostname(key.substring(0, key.indexOf(":")));
+									Settings.setRemotePort(Integer.parseInt(key.substring(key.indexOf(":") + 1)));
+									try {
+										Connection c = outgoingConnection(new Socket(Settings.getRemoteHostname(),
+												Settings.getRemotePort()));
+								
+										JSONObject authenticateObj = new JSONObject();
+										authenticateObj.put("command", "AUTHENTICATE");
+										authenticateObj.put("secret", serverSecret);
+										c.writeMsg(authenticateObj.toJSONString());
+										serversList.add(c);
+										reconnect = true;
+
+
+									} catch (IOException e) {
+										log.error("failed to make connection to "
+												+ Settings.getRemoteHostname() + ":"
+												+ Settings.getRemotePort() + " :" + e);
+										
+									}
+									
+									
+								}
 							}
 						}
 					
+					}else {
+						log.info("The initial server has crushed or disconnected");
+						
+						if(checkRemoteList.containsValue(1)) {
+							for(String key : checkRemoteList.keySet()) {
+								if(!reconnect && checkRemoteList.get(key) == 1 && address.compareTo(key)<0)  {
+									address = key;
+								}
+							}
+							
+							Settings.setRemoteHostname(address.substring(0, address.indexOf(":")));
+							Settings.setRemotePort(Integer.parseInt(address.substring(address.indexOf(":") + 1)));
+							try {
+								Connection c = outgoingConnection(new Socket(Settings.getRemoteHostname(),
+										Settings.getRemotePort()));
+						
+								JSONObject authenticateObj = new JSONObject();
+								authenticateObj.put("command", "AUTHENTICATE");
+								authenticateObj.put("secret", serverSecret);
+								c.writeMsg(authenticateObj.toJSONString());
+								serversList.add(c);
+								reconnect = true;
+
+
+							} catch (IOException e) {
+								log.error("failed to make connection to "
+										+ Settings.getRemoteHostname() + ":"
+										+ Settings.getRemotePort() + " :" + e);
+								
+							}
+							
+						}
+						
+					}
 					
-				}
+					
 				}
 			}
 			
