@@ -74,6 +74,7 @@ public class Connection extends Thread {
 			Control.getInstance().connectionClosed(this);
 			in.close();
 		} catch (IOException e) {
+			Control.removeServersList(this);
 			Control.getInstance().connectionClosed(this);
 			Control.getInstance().load = Control.getInstance().getConnections().size() - Control.getInstance().getServerConnections().size();
 			log.error("connection "+Settings.socketAddress(socket)+" closed with exception: "+e);

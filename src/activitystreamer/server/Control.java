@@ -233,6 +233,19 @@ public class Control extends Thread {
 				log.info("received Redirect request");
 				redirectCheck(con, incomingObj);
 				break;
+			case "SEQUENCE_UPDATE":
+			    log.info("received Sequence update message!");
+			    int sequence = Integer.parseInt(incomingObj.get("sequence").toString());     
+			    Settings.setSequence(sequence+1);
+			    outgoingObj = new JSONObject();
+			    outgoingObj.put("command", "SEQUENCE_UPDATE");
+			    outgoingObj.put("sequence", Settings.getSequence());
+			    for (int i = 0; i < connections.size(); i++) {
+			    	if (i != connections.indexOf(con)) {
+			    		connections.get(i).writeMsg(outgoingObj.toJSONString());
+			    	}
+			    }
+			    break;
 			default:
 				outgoingObj = new JSONObject();
 				outgoingObj.put("command", "INVALID_MESSAGE");
@@ -408,13 +421,6 @@ public class Control extends Thread {
 		String username = (String) incomingObj.get("username");
 		String secret = (String) incomingObj.get("secret");
 
-		/**
-		 * if(username.equals("anonymous")) redirect(con,incomingObj);
-		 * 
-		 * 
-		 * else
-		 **/
-
 		if (!userList.containsKey(username)) {
 			if (serversList.size() == 0) {
 				userList.put(username, secret);
@@ -422,12 +428,6 @@ public class Control extends Thread {
 				outgoingObj.put("command", "REGISTER_SUCCESS");
 				outgoingObj.put("info", "register success for" + username);
 				con.writeMsg(outgoingObj.toJSONString());
-				/**
-				 * loginList.add(username); load++; JSONObject loginObj = new JSONObject();
-				 * log.info("login success!"); loginObj.put("command", "LOGIN_SUCCESS");
-				 * loginObj.put("info", "logged in as user "+username);
-				 * con.writeMsg(loginObj.toJSONString());
-				 **/
 
 			} else {
 				userList.put(username, secret);
@@ -500,15 +500,12 @@ public class Control extends Thread {
 			activityObj.put("authenticate_user", username);
 			outgoingObj.put("activity", activityObj);
 			for (int i = 0; i < connections.size(); i++) {
-				//if (i != connections.indexOf(con)) {
 					connections.get(i).writeMsg(outgoingObj.toJSONString());
-				//}
 			}
 		} else {
 			outgoingObj.put("command", "AUTHENTICATION_FAIL");
 			outgoingObj.put("info", "user did not login");
 			con.writeMsg(outgoingObj.toJSONString());
-			//loginList.remove(username);
 			con.closeCon();
 		}
 	}
@@ -637,13 +634,26 @@ public class Control extends Thread {
 			}
 			// zhenyuan
 			
+			// sequence_update
+			if (Settings.getSequence() == 0) {
+			    JSONObject sequenceObj = new JSONObject();
+			    sequenceObj.put("command", "SEQUENCE_UPDATE");
+			    sequenceObj.put("sequence", Settings.getSequence());
+			    for (int i = 0; i < connections.size(); i++) {
+			    	if (serversList.contains(connections.get(i))) {
+			    		connections.get(i).writeMsg(sequenceObj.toJSONString());
+			    	}
+			    }
+			}
+			//
+			
 			//zhenyuan
 			JSONObject redirectObj = new JSONObject();
 			redirectObj.put("command", "REDIRECT_REQUEST");
 			redirectObj.put("senderHost", localhost);
 			redirectObj.put("senderPort", new Integer(localport));
 			String receiverKey = null; 
-			for (String key : remoteList.keySet()) {
+			for (String key : sequenceList.keySet()) {
 				log.info("For logout redirection: remote load is " + remoteList.get(key));
 				log.info("For logout redirection: My load is " + load);
 				if (remoteList.get(key).intValue() > load + 1) {
@@ -704,6 +714,7 @@ public class Control extends Thread {
 									c.writeMsg(authenticateObj.toJSONString());
 									serversList.add(c);
 									reconnect = true;
+									checkRemoteList = new HashMap<String, Integer>();
 
 
 								} catch (IOException e) {
@@ -733,6 +744,7 @@ public class Control extends Thread {
 										c.writeMsg(authenticateObj.toJSONString());
 										serversList.add(c);
 										reconnect = true;
+										checkRemoteList = new HashMap<String, Integer>();
 
 
 									} catch (IOException e) {
@@ -757,27 +769,36 @@ public class Control extends Thread {
 								}
 							}
 							
-							Settings.setRemoteHostname(address.substring(0, address.indexOf(":")));
-							Settings.setRemotePort(Integer.parseInt(address.substring(address.indexOf(":") + 1)));
-							try {
-								Connection c = outgoingConnection(new Socket(Settings.getRemoteHostname(),
-										Settings.getRemotePort()));
-						
-								JSONObject authenticateObj = new JSONObject();
-								authenticateObj.put("command", "AUTHENTICATE");
-								authenticateObj.put("secret", serverSecret);
-								c.writeMsg(authenticateObj.toJSONString());
-								serversList.add(c);
-								reconnect = true;
-
-
-							} catch (IOException e) {
-								log.error("failed to make connection to "
-										+ Settings.getRemoteHostname() + ":"
-										+ Settings.getRemotePort() + " :" + e);
+							if( !address.equals(Settings.getLocalHostname()+":"+Settings.getLocalPort())) {
 								
+								Settings.setRemoteHostname(address.substring(0, address.indexOf(":")));
+								Settings.setRemotePort(Integer.parseInt(address.substring(address.indexOf(":") + 1)));
+								try {
+									Connection c = outgoingConnection(new Socket(Settings.getRemoteHostname(),
+											Settings.getRemotePort()));
+							
+									JSONObject authenticateObj = new JSONObject();
+									authenticateObj.put("command", "AUTHENTICATE");
+									authenticateObj.put("secret", serverSecret);
+									c.writeMsg(authenticateObj.toJSONString());
+									serversList.add(c);
+									reconnect = true;
+									checkRemoteList = new HashMap<String, Integer>();
+	
+	
+								} catch (IOException e) {
+									log.error("failed to make connection to "
+											+ Settings.getRemoteHostname() + ":"
+											+ Settings.getRemotePort() + " :" + e);
+									
+								}
+							}else {
+								Settings.setSequence(0);
 							}
 							
+							
+						}else {
+							Settings.setSequence(0);
 						}
 						
 					}
@@ -833,4 +854,8 @@ public class Control extends Thread {
 	public final ArrayList<Connection> getServerConnections() {
 		return serversList;
 	}
+	
+	public static void removeServersList(Connection con) {
+		  serversList.remove(con);
+	 }
 }
