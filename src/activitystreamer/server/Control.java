@@ -23,11 +23,13 @@ public class Control extends Thread {
 	private static Map<String, String> userList;
 	private static Map<String, Integer> remoteList;
 	private static ArrayList<Connection> serversList;
+	private static Map<String, Integer> checkRemoteList;
+	private static Map<String, Integer> sequenceList;
 	private static String serverSecret = Settings.getSecret();
 	private static String id = Settings.nextSecret();
 	private static String localhost = Settings.getLocalHostname();
 	private static int localport = Settings.getLocalPort();
-	private static int load = 0;
+	public static int load = 0;
 	private static ArrayList<WaitingMessage> waitings;
 	//private static ArrayList<String> loginList;
 	private JSONParser parser = new JSONParser();
@@ -48,7 +50,9 @@ public class Control extends Thread {
 		remoteList = new HashMap<String, Integer>();
 		serversList = new ArrayList<Connection>();
 		waitings = new ArrayList<WaitingMessage>();
-		//loginList = new ArrayList<String>();
+		checkRemoteList = new HashMap<String, Integer>();
+		sequenceList = new HashMap<String, Integer>();
+		
 
 		// start a listener
 		try {
@@ -122,7 +126,7 @@ public class Control extends Thread {
 				log.info("\n\na client is trying to log in\n");
 				if (ifLogin(incomingObj)) {
 					//log.info("1");
-					load++;
+					load=connections.size()-serversList.size();
 					outgoingObj = loginSuccess(incomingObj);
 					//log.info("2");
 					redirect(con, incomingObj);
@@ -145,12 +149,18 @@ public class Control extends Thread {
 				 **/
 				control.connectionClosed(con); // remove connection
 				con.closeCon();
-				load--;
+				load=connections.size()-serversList.size();
+				log.info("connection size is :"+connections.size());
 				break;
 			case "AUTHENTICATE":
 				log.info("\n\na server is trying to authenticate\n");
 				serversList.add(con);
+				log.info("authentication success for new server!");									 // ��ѩ��
+				outgoingObj=authenticateSuccess(incomingObj);
+				log.info("sent authenticate success message!");	
+				con.writeMsg(outgoingObj.toJSONString());											   // ��ѩ��
 				if (authenticateFail(incomingObj)) {
+					log.info("aithentication fail");
 					outgoingObj = authenticateReply(incomingObj);
 					con.writeMsg(outgoingObj.toJSONString());
 					serversList.remove(con);
@@ -158,6 +168,17 @@ public class Control extends Thread {
 					con.closeCon();
 				}
 				break;
+			case "AUTHENTICATION_SUCCESS":										 // ��ѩ��
+				log.info("I receive AUTHENTICATION_SUCCESS message!\n");			 // ��ѩ��
+				int mySequence = Integer.parseInt(incomingObj.get("sequence").toString());					 // ��ѩ��
+				Settings.setSequence(mySequence);									 // ��ѩ��
+				log.info("My sequence is: "+mySequence);								 // ��ѩ��
+				if (incomingObj.containsKey("userList")) {
+				log.info("my pre "+userList);
+				userList = StringToMap(incomingObj.get("userList").toString());
+				}
+				log.info("my userList is "+userList);
+				break;																 // ��ѩ��
 			case "AUTHTENTICATION_FAIL":
 				log.info("\n\nauthentication fail!\n");
 				serversList.remove(con);
@@ -169,7 +190,9 @@ public class Control extends Thread {
 				String incomingHostname = incomingObj.get("hostname").toString();
 				String incomingPort =incomingObj.get("port").toString();
 				String incomingLoad = incomingObj.get("load").toString();
+				String incomingSequence = incomingObj.get("sequence").toString();
 				remoteList.put(incomingHostname + ":"+ incomingPort, Integer.valueOf(incomingLoad));
+				sequenceList.put(incomingHostname + ":"+ incomingPort, Integer.valueOf(incomingSequence));
 				
 				log.info("\n\nincoming server announce: \nhostname of incoming server is "+ incomingHostname +
 						 "\nport of incoming server is "+incomingPort+"\nload of incoming server is "+incomingLoad+"\n");
@@ -204,6 +227,10 @@ public class Control extends Thread {
 			case "LOCK_DENIED":
 				lockDenied(con, incomingObj);
 				break;
+			case "REDIRECT_REQUEST":
+				log.info("received Redirect request");
+				redirectCheck(con, incomingObj);
+				break;
 			default:
 				outgoingObj = new JSONObject();
 				outgoingObj.put("command", "INVALID_MESSAGE");
@@ -225,6 +252,7 @@ public class Control extends Thread {
 		}
 
 	}
+
 
 	@SuppressWarnings("unchecked")
 	public synchronized static void lockDenied(Connection con,
@@ -347,8 +375,6 @@ public class Control extends Thread {
 	public static void redirect(Connection con, JSONObject incomingObj) {
 		JSONObject outgoingObj = new JSONObject();
 		for (String key : remoteList.keySet()) {
-			log.info("remote load is " + remoteList.get(key));
-			log.info("load is " + load);
 			if (remoteList.get(key).intValue() < load - 1) {
 				log.info("redirect!");
 				//if (!incomingObj.get("username").toString()
@@ -361,8 +387,11 @@ public class Control extends Thread {
 				outgoingObj.put("port",
 						Integer.valueOf(key.substring(key.indexOf(":") + 1)));
 				con.writeMsg(outgoingObj.toJSONString());
+				connections.remove(con);
 				con.closeCon();
-				load--;
+				load=connections.size()-serversList.size();
+				log.info("remote load is " + remoteList.get(key));
+				log.info("load is " + load);
 				break;
 			}
 		}
@@ -417,7 +446,19 @@ public class Control extends Thread {
 		}
 	}
 	// zhenyuan
-
+	
+	@SuppressWarnings("unchecked")
+	public static JSONObject authenticateSuccess(JSONObject incomingObj) {						// ��ѩ��
+		JSONObject outgoingObj = new JSONObject();												// ��ѩ��
+		outgoingObj.put("command","AUTHENTICATION_SUCCESS");                                   // ��ѩ��
+		int UrSequence = Settings.getSequence()+1;
+		outgoingObj.put("sequence", UrSequence);                                       // ��ѩ��	
+		if (userList.size() != 0) {
+		outgoingObj.put("userList", userList.toString());
+		}
+		return outgoingObj;																		// ��ѩ��
+	}
+	
 	public static boolean authenticateFail(JSONObject incomingObj) {
 		String secret = (String) incomingObj.get("secret");
 		return !secret.equals(serverSecret);
@@ -499,6 +540,42 @@ public class Control extends Thread {
 		}
 	}
 
+	@SuppressWarnings("unchecked")
+	public static void redirectCheck(Connection con, JSONObject incomingObj) {
+		String receiverHost = (String) incomingObj.get("receiverHost");
+		Integer receiverPort = Integer.valueOf(incomingObj.get("receiverPort").toString());
+		String senderHost = (String) incomingObj.get("senderHost");
+		Integer senderPort = Integer.valueOf(incomingObj.get("senderPort").toString());
+		if (receiverHost.equals(localhost) && receiverPort.intValue() == localport) {
+			Connection aClient = null;
+			// TODO: check if aClient can be null.
+			for(int i = 0; i < connections.size(); i++) {
+				if(!serversList.contains(connections.get(i))) {
+					aClient = connections.get(i);
+					log.info("aClient=connection.getiִ����");
+				}
+			}
+			log.info("Time to write REDIRECT message to client");
+			JSONObject outgoingObj = new JSONObject();
+			outgoingObj.put("command", "REDIRECT");
+			outgoingObj.put("hostname", senderHost);
+			outgoingObj.put("port", senderPort);
+			aClient.writeMsg(outgoingObj.toJSONString());
+			log.info("before close connection");
+			connections.remove(aClient);
+			aClient.closeCon();
+			load=connections.size()-serversList.size();		
+		}else {
+			for(int i = 0; i < serversList.size(); i++) {
+				if(i != serversList.indexOf(con)) {
+					serversList.get(i).writeMsg(incomingObj.toJSONString());
+				}
+			}
+		}
+		
+	}
+	
+	
 	/*
 	 * The connection has been closed by the other party.
 	 */
@@ -530,8 +607,8 @@ public class Control extends Thread {
 		Connection c = new Connection(s);
 		connections.add(c);
 		return c;
-
 	}
+	
 
 	@SuppressWarnings("unchecked")
 	@Override
@@ -556,7 +633,95 @@ public class Control extends Thread {
 				}
 			}
 			// zhenyuan
+			
+			//zhenyuan
+			JSONObject redirectObj = new JSONObject();
+			redirectObj.put("command", "REDIRECT_REQUEST");
+			redirectObj.put("senderHost", localhost);
+			redirectObj.put("senderPort", new Integer(localport));
+			String receiverKey = null; 
+			for (String key : remoteList.keySet()) {
+				log.info("For logout redirection: remote load is " + remoteList.get(key));
+				log.info("For logout redirection: My load is " + load);
+				if (remoteList.get(key).intValue() > load + 1) {
+					receiverKey = key;
+				}
+			}
+			if(receiverKey != null) {
+				System.out.println("send request to redirect");
+				log.info("send request to redirect");
+				redirectObj.put("receiverHost",receiverKey.substring(0, receiverKey.indexOf(":")));
+				redirectObj.put("receiverPort", Integer.valueOf(receiverKey.substring(receiverKey.indexOf(":") + 1)));
+				
+				for(int i = 0; i < serversList.size(); i++) {
+					serversList.get(i).writeMsg(redirectObj.toJSONString());
+				}
+			//zhenyuan	
+				
+			}
+			
+			/*
+			for (String key : checkRemoteList.keySet()) {
+				if( ! sequenceList.containsKey(key)) {
+					log.info("server "+key+" crashed or disconnected");
+				}
+			}
+			*/
+			
+			Integer minSequence = Settings.getSequence();
+			
+			//TODO: check the judgment of this if clause.
+			if( checkRemoteList.size() !=0 && !sequenceList.containsValue(0)) {
+				for (String key : sequenceList.keySet()) {
+					if(minSequence < sequenceList.get(key)) {
+						minSequence = sequenceList.get(key);
+					}
+				}
+				
+				if(minSequence == Settings.getSequence()) {
+					if(Settings.getSequence() != 1) {
 
+						for(String key : checkRemoteList.keySet()) {
+							if(!key.equals(Settings.getRemoteHostname()+":"+Settings.getRemotePort())
+									&& checkRemoteList.get(key) == minSequence - 1 )  {
+									//redirect to this server
+								
+								Settings.setRemoteHostname(key.substring(0, key.indexOf(":")));
+								Settings.setRemotePort(Integer.parseInt(key.substring(key.indexOf(":") + 1)));
+								try {
+									Connection c = outgoingConnection(new Socket(Settings.getRemoteHostname(),
+											Settings.getRemotePort()));
+							
+									JSONObject authenticateObj = new JSONObject();
+									authenticateObj.put("command", "AUTHENTICATE");
+									authenticateObj.put("secret", serverSecret);
+									c.writeMsg(authenticateObj.toJSONString());
+									serversList.add(c);
+
+
+								} catch (IOException e) {
+									log.error("failed to make connection to "
+											+ Settings.getRemoteHostname() + ":"
+											+ Settings.getRemotePort() + " :" + e);
+									System.exit(-1);
+								}
+							}					
+						
+						}
+						
+						for(String key : checkRemoteList.keySet()) {
+							if(checkRemoteList.get(key) == minSequence - 2) {
+								//redirect to this server
+							}
+						}
+					
+					
+				}
+				}
+			}
+			
+			checkRemoteList = sequenceList; sequenceList = new HashMap<String, Integer>();
+			
 			try {
 				Thread.sleep(Settings.getActivityInterval());
 			} catch (InterruptedException e) {
@@ -576,6 +741,16 @@ public class Control extends Thread {
 		}
 		listener.setTerm(true);
 	}
+	
+	public static Map<String, String> StringToMap(String str){
+		Map<String, String> map = new HashMap<String, String>();
+		str = str.substring(1, str.length()-1);
+		int k = str.length() - str.replaceAll(",","").length();
+		for(int i = 0; i <= k; i++) {
+			map.put(str.split(",")[i].split("=")[0],str.split(",")[i].split("=")[1]);
+		}
+		return map;
+	}
 
 	public boolean doActivity() {
 		return false;
@@ -587,5 +762,9 @@ public class Control extends Thread {
 
 	public final ArrayList<Connection> getConnections() {
 		return connections;
+	}
+	
+	public final ArrayList<Connection> getServerConnections() {
+		return serversList;
 	}
 }

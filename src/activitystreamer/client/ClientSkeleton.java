@@ -127,6 +127,7 @@ public class ClientSkeleton extends Thread {
 			}		
 			
 			if(command.equals("REDIRECT")) {
+				log.info("I received the redirect message from server!!!");
 				Settings.setRemoteHostname(incomingObj.get("hostname").toString());
 				Settings.setRemotePort(Integer.parseInt(incomingObj.get("port").toString()));
 				clientSolution.disconnect();
