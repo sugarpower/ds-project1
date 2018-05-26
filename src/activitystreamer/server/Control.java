@@ -128,14 +128,10 @@ public class Control extends Thread {
 			case "LOGIN":
 				log.info("\n\na client is trying to log in\n");
 				if (ifLogin(incomingObj)) {
-					//log.info("1");
 					load=connections.size()-serversList.size();
 					outgoingObj = loginSuccess(incomingObj);
-					//log.info("2");
 					redirect(con, incomingObj);
-					//log.info("3");
 				} else {
-					//log.info("4");
 					outgoingObj = loginFail(incomingObj);
 				}
 				con.writeMsg(outgoingObj.toJSONString());
@@ -728,7 +724,10 @@ public class Control extends Thread {
 						
 						}
 						
-						if(!reconnect) {
+						if(!reconnect && minSequence > 1) {
+							Settings.setSequence(Settings.getSequence() - 1);
+							minSequence = Settings.getSequence();
+							/*
 							for(String key : checkRemoteList.keySet()) {
 								if(!reconnect && checkRemoteList.get(key) == minSequence - 2) {
 									//redirect to this server
@@ -758,6 +757,7 @@ public class Control extends Thread {
 									
 								}
 							}
+							*/
 						}
 					
 					}else {
@@ -808,7 +808,7 @@ public class Control extends Thread {
 				}
 			}
 			
-			sequenceList0 = sequenceList; sequenceList = new HashMap<String, Integer>();
+			
 			
 			if(serversList.size() == 0 && sequenceList.isEmpty() && Settings.getSequence() != 0) {
 				initiateConnection();
@@ -841,6 +841,8 @@ public class Control extends Thread {
 							+ Settings.getRemotePort() + " :" + e);
 				}
 			}
+			
+			sequenceList0 = sequenceList; sequenceList = new HashMap<String, Integer>();
 			
 			try {
 				Thread.sleep(Settings.getActivityInterval());
