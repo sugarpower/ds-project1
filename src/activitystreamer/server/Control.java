@@ -238,9 +238,9 @@ public class Control extends Thread {
 			    outgoingObj = new JSONObject();
 			    outgoingObj.put("command", "SEQUENCE_UPDATE");
 			    outgoingObj.put("sequence", Settings.getSequence());
-			    for (int i = 0; i < connections.size(); i++) {
-			    	if (i != connections.indexOf(con)) {
-			    		connections.get(i).writeMsg(outgoingObj.toJSONString());
+			    for (int i = 0; i < serversList.size(); i++) {
+			    	if (i != serversList.indexOf(con)) {
+			    		serversList.get(i).writeMsg(outgoingObj.toJSONString());
 			    	}
 			    }
 			    break;
