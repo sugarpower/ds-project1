@@ -199,6 +199,7 @@ public class Control extends Thread {
 				for (int i = 0; i < connections.size(); i++) {
 					if (i != connections.indexOf(con)
 							&& serversList.contains(connections.get(i))) {
+						log.info(connections.get(i));
 						connections.get(i)
 								.writeMsg(incomingObj.toJSONString());
 					}
@@ -653,6 +654,7 @@ public class Control extends Thread {
 			for (String key : sequenceList.keySet()) {
 				log.info("For logout redirection: remote load is " + remoteList.get(key));
 				log.info("For logout redirection: My load is " + load);
+				log.info("My sequence is "+ Settings.getSequence());
 				if (remoteList.get(key).intValue() > load + 1) {
 					receiverKey = key;
 				}
@@ -692,11 +694,15 @@ public class Control extends Thread {
 				}
 				
 				if(minSequence == Settings.getSequence()) {
+					log.info("1");
 					if(Settings.getSequence() != 1) {
-
+						log.info("2");
 						for(String key : checkRemoteList.keySet()) {
 							if(!reconnect && !key.equals(Settings.getRemoteHostname()+":"+Settings.getRemotePort())
 									&& checkRemoteList.get(key) == minSequence - 1 )  {
+								log.info("3");
+								log.info(key);
+								log.info(Settings.getRemoteHostname()+":"+Settings.getRemotePort());
 									//redirect to this server
 								
 								Settings.setRemoteHostname(key.substring(0, key.indexOf(":")));
@@ -725,9 +731,8 @@ public class Control extends Thread {
 						}
 						
 						if(!reconnect && minSequence > 1) {
-							Settings.setSequence(Settings.getSequence() - 1);
-							minSequence = Settings.getSequence();
-							/*
+							log.info("4");
+							
 							for(String key : checkRemoteList.keySet()) {
 								if(!reconnect && checkRemoteList.get(key) == minSequence - 2) {
 									//redirect to this server
@@ -757,13 +762,82 @@ public class Control extends Thread {
 									
 								}
 							}
-							*/
+							
+						}
+						if(!reconnect && minSequence > 1) {
+							log.info("4");
+							
+							for(String key : checkRemoteList.keySet()) {
+								if(!reconnect && checkRemoteList.get(key) == minSequence - 3) {
+									//redirect to this server
+									
+									Settings.setRemoteHostname(key.substring(0, key.indexOf(":")));
+									Settings.setRemotePort(Integer.parseInt(key.substring(key.indexOf(":") + 1)));
+									try {
+										Connection c = outgoingConnection(new Socket(Settings.getRemoteHostname(),
+												Settings.getRemotePort()));
+								
+										JSONObject authenticateObj = new JSONObject();
+										authenticateObj.put("command", "AUTHENTICATE");
+										authenticateObj.put("secret", serverSecret);
+										c.writeMsg(authenticateObj.toJSONString());
+										serversList.add(c);
+										reconnect = true;
+										checkRemoteList = new HashMap<String, Integer>();
+
+
+									} catch (IOException e) {
+										log.error("failed to make connection to "
+												+ Settings.getRemoteHostname() + ":"
+												+ Settings.getRemotePort() + " :" + e);
+										
+									}
+									
+									
+								}
+							}
+							
+						}
+						if(!reconnect && minSequence > 1) {
+							log.info("4");
+							
+							for(String key : checkRemoteList.keySet()) {
+								if(!reconnect && checkRemoteList.get(key) == minSequence - 4) {
+									//redirect to this server
+									
+									Settings.setRemoteHostname(key.substring(0, key.indexOf(":")));
+									Settings.setRemotePort(Integer.parseInt(key.substring(key.indexOf(":") + 1)));
+									try {
+										Connection c = outgoingConnection(new Socket(Settings.getRemoteHostname(),
+												Settings.getRemotePort()));
+								
+										JSONObject authenticateObj = new JSONObject();
+										authenticateObj.put("command", "AUTHENTICATE");
+										authenticateObj.put("secret", serverSecret);
+										c.writeMsg(authenticateObj.toJSONString());
+										serversList.add(c);
+										reconnect = true;
+										checkRemoteList = new HashMap<String, Integer>();
+
+
+									} catch (IOException e) {
+										log.error("failed to make connection to "
+												+ Settings.getRemoteHostname() + ":"
+												+ Settings.getRemotePort() + " :" + e);
+										
+									}
+									
+									
+								}
+							}
+							
 						}
 					
 					}else {
 						log.info("The initial server has crushed or disconnected");
 						
 						if(checkRemoteList.containsValue(1)) {
+							log.info("5");
 							for(String key : checkRemoteList.keySet()) {
 								if(!reconnect && checkRemoteList.get(key) == 1 && address.compareTo(key)<0)  {
 									address = key;
@@ -771,6 +845,7 @@ public class Control extends Thread {
 							}
 							
 							if( !address.equals(Settings.getLocalHostname()+":"+Settings.getLocalPort())) {
+								log.info("6");
 								
 								Settings.setRemoteHostname(address.substring(0, address.indexOf(":")));
 								Settings.setRemotePort(Integer.parseInt(address.substring(address.indexOf(":") + 1)));
@@ -794,11 +869,13 @@ public class Control extends Thread {
 									
 								}
 							}else {
+								log.info("7");
 								Settings.setSequence(0);
 							}
 							
 							
 						}else {
+							log.info("8");
 							Settings.setSequence(0);
 						}
 						
@@ -809,13 +886,15 @@ public class Control extends Thread {
 			}
 			
 			
-			
+			/*
 			if(serversList.size() == 0 && sequenceList.isEmpty() && Settings.getSequence() != 0) {
+				log.info("9");
 				initiateConnection();
-			}
+			}*/
 			
-			
+			/*
 			if(serversList.size() == 0 && sequenceList.isEmpty() && Settings.getSequence() == 0 && remoteList.size() !=0 ) {
+				log.info("10");
 				Random rnd = new Random();
 			    int randomNum = rnd.nextInt(remoteList.size());
 			    ArrayList<String> keys = new ArrayList<String>(remoteList.keySet());
@@ -840,7 +919,7 @@ public class Control extends Thread {
 							+ Settings.getRemoteHostname() + ":"
 							+ Settings.getRemotePort() + " :" + e);
 				}
-			}
+			}*/
 			
 			sequenceList0 = sequenceList; sequenceList = new HashMap<String, Integer>();
 			
