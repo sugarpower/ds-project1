@@ -1,4 +1,4 @@
-Distributed System Project1
+Distributed System Project 2
 
 ------------------------------------------------------------------------------
 Project information
@@ -172,12 +172,6 @@ If users want to end the connections between the client and the server
 connected, clicking disconnect button will make sense, but the  relavent GUI 
 will never be automatically closed. 
 
-*** Warning ***
-While a client connecting to the servers is redirected to another server, 
-the redirection operation will be done automatically, and the GUI window of
-the old connection will show the redirect message, but the window will never
-be closed automatically.
-
 ------------------------------------------------------------------------------
 
 2. server
@@ -185,3 +179,12 @@ be closed automatically.
 Servers online should not be concerned, since we assume they never go down.
 
 ------------------------------------------------------------------------------
+
+*** Warning ***
+While a client connecting to the servers is redirected to another server, 
+the redirection operation will be done automatically, and the GUI window of
+the old connection will show the redirect message, but the window will never
+be closed automatically.
+
+Once a server fails (crash/network problem), the system needs enough time to
+reform it self.

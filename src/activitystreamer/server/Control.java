@@ -3,8 +3,11 @@ package activitystreamer.server;
 import java.io.IOException;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Random;
 
 import org.apache.logging.log4j.LogManager;
@@ -15,6 +18,9 @@ import org.json.simple.parser.ParseException;
 
 import activitystreamer.util.Settings;
 import activitystreamer.util.WaitingMessage;
+import activitystreamer.util.WaitingReply;
+import activitystreamer.util.ActivityBroad;
+import activitystreamer.util.Message;
 
 public class Control extends Thread {
 	private static final Logger log = LogManager.getLogger();
@@ -35,6 +41,11 @@ public class Control extends Thread {
 	private static ArrayList<WaitingMessage> waitings;
 	//private static ArrayList<String> loginList;
 	private JSONParser parser = new JSONParser();
+	private static Queue<Message> MessageQue;//////
+	private static Map<Connection,String> userLogin;//////
+	private static Map<String,Long> TimeStamp;//////
+	private static ArrayList<WaitingReply> waitingreply; //////
+	private static ArrayList<Connection> AnonymousCon;//////
 
 	protected static Control control = null;
 
@@ -55,6 +66,11 @@ public class Control extends Thread {
 		checkRemoteList = new HashMap<String, Integer>();
 		sequenceList = new HashMap<String, Integer>();
 		sequenceList0 = new HashMap<String, Integer>();
+		MessageQue=new LinkedList<Message>();        //////
+		TimeStamp=new HashMap<String,Long>();        //////
+        userLogin=new HashMap<Connection,String>();  //////
+        waitingreply=new  ArrayList<WaitingReply>(); //////
+        AnonymousCon= new ArrayList<Connection>();
 		
 
 		// start a listener
@@ -125,31 +141,70 @@ public class Control extends Thread {
 		if (incomingObj.containsKey("command")) {
 			String cmd = (String) incomingObj.get("command");
 			switch (cmd) {
+			/////
 			case "LOGIN":
 				log.info("\n\na client is trying to log in\n");
-				if (ifLogin(incomingObj)) {
+				String username = (String) incomingObj.get("username");
+				String secret = (String) incomingObj.get("secret");
+				
+				if (ifLogin(username,secret)&&(!TimeStamp.containsKey(username))) {
+					//log.info("1");
 					load=connections.size()-serversList.size();
 					outgoingObj = loginSuccess(incomingObj);
-					redirect(con, incomingObj);
+					//log.info("2");
+					
+					if(!username.equals("anonymous")) {
+					userLogin.put(con,username);
+					log.info("\n"+username+": successful login"+"\n");
+					checkreply(username);
+					//log.info("3");
+					}
+					redirect(con, incomingObj);			
 				} else {
-					outgoingObj = loginFail(incomingObj);
+					//log.info("4");
+					outgoingObj = loginFail(incomingObj,username);
 				}
 				con.writeMsg(outgoingObj.toJSONString());
 				break;
+				
 			case "REGISTER":
 				log.info("\n\na client is trying to register\n");
 				register(con, incomingObj);
 				break;
+				
 			case "LOGOUT":
 				log.info("\n\na client is trying to logout\n");
-				/**
-				 * if(!incomingObj.get("username").toString().equals("anonymous")) {
-				 * loginList.remove(incomingObj.get("username").toString()); }
-				 **/
-				control.connectionClosed(con); // remove connection
-				con.closeCon();
+				String username1=(String)incomingObj.get("username");
+				
+				if(!username1.equals("anonymous"))
+					for(int i=0;i<serversList.size();i++)/////
+						if(!con.equals(serversList.get(i)))
+			        	serversList.get(i).writeMsg(incomingObj.toJSONString());
+				else AnonymousCon.remove(con);
+				
+				if(TimeStamp.containsKey(username1))/////
+				TimeStamp.remove(username1);
+				
+				if(connections.contains(con)&&!serversList.contains(con))//////
+				{
+				 userLogin.remove(con);//////
+				 control.connectionClosed(con);// remove connection
+				  con.closeCon();
+				}
+	
 				load=connections.size()-serversList.size();
 				log.info("connection size is :"+connections.size());
+				break;
+	/////	
+				
+			case "LOGIN_SUCCESS":
+				log.info("\n\na client is login at other server\n");
+				TimeStamp.put((String)incomingObj.get("username"),
+						      Long.parseLong((String)incomingObj.get("timestamp")));
+				
+				for(int i=0;i<serversList.size();i++)/////
+					if(!con.equals(serversList.get(i)))
+		        	serversList.get(i).writeMsg(incomingObj.toJSONString());
 				break;
 			case "AUTHENTICATE":
 				log.info("\n\na server is trying to authenticate\n");
@@ -168,12 +223,12 @@ public class Control extends Thread {
 				}
 				break;
 			case "AUTHENTICATION_SUCCESS":										 // ��ѩ��
-				log.info("I receive AUTHENTICATION_SUCCESS message!\n");			 // ��ѩ��
+				log.info("\n\nreceived AUTHENTICATION_SUCCESS message\n");			 // ��ѩ��
 				int mySequence = Integer.parseInt(incomingObj.get("sequence").toString());					 // ��ѩ��
 				Settings.setSequence(mySequence);									 // ��ѩ��
-				log.info("My sequence is: "+mySequence);								 // ��ѩ��
+				log.info("my sequence is: "+mySequence);								 // ��ѩ��
 				if (incomingObj.containsKey("userList")) {
-				log.info("my pre "+userList);
+
 				userList = StringToMap(incomingObj.get("userList").toString());
 				}
 				log.info("my userList is "+userList);
@@ -199,25 +254,34 @@ public class Control extends Thread {
 				for (int i = 0; i < connections.size(); i++) {
 					if (i != connections.indexOf(con)
 							&& serversList.contains(connections.get(i))) {
-						log.info(connections.get(i));
+						
 						connections.get(i)
 								.writeMsg(incomingObj.toJSONString());
 					}
 				}
 				break;
 
-			case "ACTIVITY_MESSAGE":
-				log.info("\n\na client is trying to send activity message\n");
-				activityMessage(con, incomingObj);
-				break;
-			case "ACTIVITY_BROADCAST":
-				outgoingObj = incomingObj;
-				for (int i = 0; i < connections.size(); i++) {
-					if (i != connections.indexOf(con)) {
-						connections.get(i)
-								.writeMsg(outgoingObj.toJSONString());
-					}
-				}
+			    //////
+				case "ACTIVITY_MESSAGE":
+					log.info("\n\na client is trying to send activity message\n");
+					Message tempM=new Message(incomingObj,con,"ACTIVITY_MESSAGE");
+					MessageQue.add(tempM);
+					break;
+					
+				//////	
+				case "ACTIVITY_BROADCAST":	
+					log.info("\n\na client is trying to send activity broadcast\n");
+					Message tempX=new Message(incomingObj,con,"ACTIVITY_BROADCAST");
+					tempX.setCon(con);
+					MessageQue.add(tempX);
+				    break;
+				    
+				//////
+				case "ACTIVITY_REPLY":
+					log.info("\n\nreturn reciept");
+					activityReply(con,incomingObj);
+				    break;
+				    
 			case "LOCK_REQUEST":
 				lockReply(con, incomingObj);
 				break;
@@ -266,6 +330,16 @@ public class Control extends Thread {
 
 	}
 
+//////
+	public static void checkreply(String username) {
+		for(int i=0;i<waitingreply.size();i++) {
+			WaitingReply temp=waitingreply.get(i);
+			if(username.equals(temp.getUser())){
+				 for(int j=0;j<serversList.size();j++)
+					 serversList.get(i).writeMsg(temp.getMsg());
+			 }
+			}
+	}
 
 	@SuppressWarnings("unchecked")
 	public synchronized static void lockDenied(Connection con,
@@ -321,15 +395,9 @@ public class Control extends Thread {
 						outgoingObj.put("info",
 								"register success for " + username);
 						temp.getConnection()
-								.writeMsg(outgoingObj.toJSONString());
-						JSONObject loginObj = new JSONObject();
-						log.info("\n\nlogin success!\n");
-						loginObj.put("command", "LOGIN_SUCCESS");
-						loginObj.put("info", "logged in as user " + username);
-						temp.getConnection().writeMsg(loginObj.toJSONString());
+								.writeMsg(outgoingObj.toJSONString());			
+						///////
 						userList.put(username, secret);
-						log.info("falg master");
-						redirect(temp.getConnection(), incomingObj);
 					}
 					waitings.remove(temp);
 					break;
@@ -340,11 +408,8 @@ public class Control extends Thread {
 
 	// zhenyuan&xueyang
 
-	public static boolean ifLogin(JSONObject incomingObj) {
+	public static boolean ifLogin(String username,String secret) {
 		boolean successLogin = false;
-		String username = (String) incomingObj.get("username");
-		String secret = (String) incomingObj.get("secret");
-		
 		if (username.equals("anonymous")) {
 			successLogin = true;
 		} else if (userList.containsKey(username)) {
@@ -361,23 +426,29 @@ public class Control extends Thread {
 
 		JSONObject outgoingObj = new JSONObject();
 		String username = (String) incomingObj.get("username");
-
+        long time = (new Date().getTime());
+        
 		log.info("\n\nlogin success!\n");
 		outgoingObj.put("command", "LOGIN_SUCCESS");
 		outgoingObj.put("info", "logged in as user " + username);
-		//loginList.add(username);
+		outgoingObj.put("username", username);
+		outgoingObj.put("timestamp", Long.toString((time)));
+		
 		return outgoingObj;
 	}
 	// zhenyuan
 
 	// zhenyuan
 	@SuppressWarnings("unchecked")
-	public static JSONObject loginFail(JSONObject incomingObj) {
+	public static JSONObject loginFail(JSONObject incomingObj,String username) {
 
 		JSONObject outgoingObj = new JSONObject();
-
+        
 		outgoingObj.put("command", "LOGIN_FAILED");
-		outgoingObj.put("info", "attempt to login with wrong secret");
+		
+		if((TimeStamp.containsKey(username)))//////
+			outgoingObj.put("info", "attempt to login already exist");
+			else outgoingObj.put("info", "attempt to login with wrong secret");
 
 		return outgoingObj;
 	}
@@ -387,8 +458,10 @@ public class Control extends Thread {
 	@SuppressWarnings("unchecked")
 	public static void redirect(Connection con, JSONObject incomingObj) {
 		JSONObject outgoingObj = new JSONObject();
+		int Flag=0;
 		for (String key : remoteList.keySet()) {
 			if (remoteList.get(key).intValue() < load - 1) {
+				Flag=1;
 				log.info("redirect!");
 				//if (!incomingObj.get("username").toString()
 				//		.equals("anonymous")) {
@@ -400,15 +473,45 @@ public class Control extends Thread {
 				outgoingObj.put("port",
 						Integer.valueOf(key.substring(key.indexOf(":") + 1)));
 				con.writeMsg(outgoingObj.toJSONString());
-				connections.remove(con);
+				connections.remove(con);    /////
 				con.closeCon();
+				
+				/////
+				if(userLogin.containsKey(con))
+					userLogin.remove(con);	
 				load=connections.size()-serversList.size();
+				log.info("redirect to "+key);
 				log.info("remote load is " + remoteList.get(key));
 				log.info("load is " + load);
 				break;
 			}
 		}
-
+		
+		////////
+	if(Flag==0) {
+		Long time= new Date().getTime();
+		String username = (String) incomingObj.get("username");
+		outgoingObj.put("command", "LOGIN_SUCCESS");
+		
+		if(incomingObj.get("username").equals("anonymous")){
+			outgoingObj.put("username", username);
+			outgoingObj.put("info", "logged in as user " + username);
+			outgoingObj.put("timestamp", Long.toString(time));
+			 AnonymousCon.add(con);
+			}
+		
+		else {
+			log.info("\n\nset con with the server��"+username);
+			TimeStamp.put(username, time);
+			outgoingObj.put("username", username);
+			outgoingObj.put("info", "logged in as user " + username);
+			outgoingObj.put("timestamp", Long.toString(time));
+			
+			for(int i=0;i<serversList.size();i++)//////
+	          serversList.get(i).writeMsg(outgoingObj.toJSONString());
+		}
+		con.writeMsg(outgoingObj.toJSONString());
+	}
 	}
 	// zhenyuan
 
@@ -473,40 +576,117 @@ public class Control extends Thread {
 		return outgoingObj;
 	}
 
+///////
+	public static void activityReply(Connection con,
+			JSONObject obj) {
+		 JSONObject temp=obj;
+		 String sender=(String)obj.get("sender");
+		 String reciever=(String)obj.get("reciever");
+		 String timestamp=(String)obj.get("timestamp");
+		 String key=reciever+sender+timestamp;
+		 
+		 int m=waitingreply.size();
+		 for(int i=0;i<m;i++){
+			 if(waitingreply.get(i).getKey().equals(key))
+			 {waitingreply.remove(i);m=-1;break;}
+		 }
+		 if(m!=-1)
+		  for(int i=0;i<serversList.size();i++) {
+				if(!serversList.get(i).equals(con))
+					serversList.get(i).writeMsg(temp.toJSONString());
+		  }
+	}
+
+///////
+	public static void activityBroadcast(Connection con,
+			JSONObject tempMsg) {
+	  JSONObject temp=tempMsg;
+	  String reciever=(String)tempMsg.get("reciever");
+	  
+	  if(userLogin.containsValue(reciever)) {
+		log.info("\n\n sending to certain user\n");
+		  for(Connection key:userLogin.keySet()){
+			  if(userLogin.get(key).equals(reciever)) {
+				  key.writeMsg(temp.toJSONString());
+			      break;
+			   }
+		  }
+	  }
+	  
+	  else if(reciever.equals("anonymous")) {
+		 for(int i=0;i<AnonymousCon.size();i++)
+			 AnonymousCon.get(i).writeMsg(tempMsg.toJSONString());
+			 
+		 for(int i1 = 0; i1 < serversList.size(); i1++) {
+			  if (i1 != serversList.indexOf(con)) 
+				serversList.get(i1).writeMsg(tempMsg.toJSONString());
+		}
+	  }
+		  
+	  else {
+		log.info("\n\n broadcasting\n");
+			for (int i1 = 0; i1 < serversList.size(); i1++) {
+			  if (i1 != serversList.indexOf(con)) 
+				serversList.get(i1).writeMsg(tempMsg.toJSONString());					  
+	        }
+	  }
+	}
+	
 	@SuppressWarnings("unchecked")
 	public static void activityMessage(Connection con,
 			JSONObject incomingObj) {
-		JSONObject outgoingObj = new JSONObject();
-		boolean successLogin = false;
-		String username = (String) incomingObj.get("username");
-		String secret = (String) incomingObj.get("secret");
-		// String activity = (String) incomingObj.get("activity");
+			JSONObject outgoingObj = new JSONObject();
+			boolean successLogin = false;
+			String username = (String) incomingObj.get("username");
+			String secret = (String) incomingObj.get("secret");
+			String timestamp=(String) incomingObj.get("timestamp");//////
+			ArrayList<JSONObject> newMessage=new ArrayList<JSONObject>();//////
+			
+			// String activity = (String) incomingObj.get("activity");
 
-		if (username.equals("anonymous")) {
-			successLogin = true;
-		} else if (/** loginList.contains(username) && **/
-		userList.get(username).equals(secret)) {
-			successLogin = true;
-		}
-
-		if (successLogin) {
-			outgoingObj.put("command", "ACTIVITY_BROADCAST");
-			JSONObject activityObj = (JSONObject) incomingObj.get("activity");
-			if(activityObj.containsKey("authenticated_user")) {
-				activityObj.remove("authenticated_user");
+			if (username.equals("anonymous")) {
+				successLogin = true;
+			} else if (userList.get(username).equals(secret)) {
+				successLogin = true;
 			}
-			activityObj.put("authenticate_user", username);
-			outgoingObj.put("activity", activityObj);
-			for (int i = 0; i < connections.size(); i++) {
-					connections.get(i).writeMsg(outgoingObj.toJSONString());
+	        
+			log.info("\n\n sending message\n");
+			if (successLogin) {
+				outgoingObj.put("command", "ACTIVITY_BROADCAST");
+				JSONObject activityObj = (JSONObject) incomingObj.get("activity");
+				if(activityObj.containsKey("authenticated_user")) {
+					activityObj.remove("authenticated_user");
+				}
+				activityObj.put("authenticate_user", username);
+				outgoingObj.put("activity", activityObj);
+				outgoingObj.put("timestamp", timestamp); //////
+				
+	//////   
+				log.info("\n\n broadcasting Message\n");
+				newMessage=new ActivityBroad(outgoingObj,TimeStamp).message();
+		        for(String key:TimeStamp.keySet())
+		        	log.info(TimeStamp.get(key)+":"+key+"");
+		        
+		        log.info(newMessage.size());
+		        String msg;
+			    for(int j=0;j<newMessage.size();j++)
+			    {
+		            msg=newMessage.get(j).toJSONString();
+			        log.info(msg);
+			        waitingreply.add(new WaitingReply(newMessage.get(j)));
+					for (int i = 0; i < serversList.size(); i++) {
+						serversList.get(i).writeMsg(msg);
+					}
+					activityBroadcast(con,newMessage.get(j));
+				}
+			} else {
+				outgoingObj.put("command", "AUTHENTICATION_FAIL");
+				outgoingObj.put("info", "user did not login");
+				con.writeMsg(outgoingObj.toJSONString());
+				//loginList.remove(username);
+				con.closeCon();
 			}
-		} else {
-			outgoingObj.put("command", "AUTHENTICATION_FAIL");
-			outgoingObj.put("info", "user did not login");
-			con.writeMsg(outgoingObj.toJSONString());
-			con.closeCon();
 		}
-	}
 
 	@SuppressWarnings("unchecked")
 	public static void lockReply(Connection con, JSONObject incomingObj) {
@@ -652,9 +832,6 @@ public class Control extends Thread {
 			redirectObj.put("senderPort", new Integer(localport));
 			String receiverKey = null; 
 			for (String key : sequenceList.keySet()) {
-				log.info("For logout redirection: remote load is " + remoteList.get(key));
-				log.info("For logout redirection: My load is " + load);
-				log.info("My sequence is "+ Settings.getSequence());
 				if (remoteList.get(key).intValue() > load + 1) {
 					receiverKey = key;
 				}
@@ -672,6 +849,33 @@ public class Control extends Thread {
 				
 			}
 			
+			
+			int size=MessageQue.size();
+			
+			 if(size>0) {
+				log.info("\n\ntry to clean all the message\n");
+				Message msg=new Message();
+							
+				for(int i=0;i<size;i++) {
+					 msg=MessageQue.poll();
+					 log.info("\n\n"+msg.getMsg().toJSONString());
+				        for(String key:TimeStamp.keySet())
+				        	log.info(TimeStamp.get(key)+":"+key+"\n");
+					 String command=(String) msg.getCommand();	
+					 if(command.equals("ACTIVITY_MESSAGE")) {
+						 log.info("\n\ntry to clean ACTIVITY_MESSAGE\n");
+						activityMessage(msg.getCon(), msg.getMsg());
+					}
+								
+				     else if(command.equals("ACTIVITY_BROADCAST")) {
+				    	 log.info("\n\ntry to clean ACTIVITY_BROADCAST\n");
+				    	  activityBroadcast(msg.getCon(), msg.getMsg());
+					 }
+				}
+			}	
+			
+			
+			// reconnect part
 			if(sequenceList.size() !=0) {
 				for(String key : sequenceList.keySet()) {
 					checkRemoteList.put(key, sequenceList.get(key));
@@ -694,13 +898,13 @@ public class Control extends Thread {
 				}
 				
 				if(minSequence == Settings.getSequence()) {
-					log.info("1");
+					log.info("\n\ni am the head of the remaining subtree \n");
 					if(Settings.getSequence() != 1) {
-						log.info("2");
+						
 						for(String key : checkRemoteList.keySet()) {
-							log.info("3");
-							log.info(key);
-							log.info(Settings.getRemoteHostname()+":"+Settings.getRemotePort());
+							
+							log.info("trying to connect to: "+key);
+							
 		
 							if(!reconnect /*&& !key.equals(Settings.getRemoteHostname()+":"+Settings.getRemotePort())*/
 									&& checkRemoteList.get(key) == minSequence)  {
@@ -720,7 +924,7 @@ public class Control extends Thread {
 									serversList.add(c);
 									reconnect = true;
 									checkRemoteList = new HashMap<String, Integer>();
-
+									log.info("reconnect to the system");
 
 								} catch (IOException e) {
 									log.error("failed to make connection to "
@@ -733,7 +937,7 @@ public class Control extends Thread {
 						}
 						
 						if(!reconnect && minSequence > 1) {
-							log.info("4");
+							
 							
 							for(String key : checkRemoteList.keySet()) {
 								if(!reconnect && checkRemoteList.get(key) == minSequence - 1) {
@@ -752,7 +956,7 @@ public class Control extends Thread {
 										serversList.add(c);
 										reconnect = true;
 										checkRemoteList = new HashMap<String, Integer>();
-
+										log.info("reconnect to the system");
 
 									} catch (IOException e) {
 										log.error("failed to make connection to "
@@ -767,7 +971,7 @@ public class Control extends Thread {
 							
 						}
 						if(!reconnect && minSequence > 1) {
-							log.info("4");
+						
 							
 							for(String key : checkRemoteList.keySet()) {
 								if(!reconnect && checkRemoteList.get(key) == minSequence - 2) {
@@ -786,7 +990,7 @@ public class Control extends Thread {
 										serversList.add(c);
 										reconnect = true;
 										checkRemoteList = new HashMap<String, Integer>();
-
+										log.info("reconnect to the system");
 
 									} catch (IOException e) {
 										log.error("failed to make connection to "
@@ -801,7 +1005,7 @@ public class Control extends Thread {
 							
 						}
 						if(!reconnect && minSequence > 1) {
-							log.info("4");
+						
 							
 							for(String key : checkRemoteList.keySet()) {
 								if(!reconnect && checkRemoteList.get(key) == minSequence - 3) {
@@ -820,7 +1024,7 @@ public class Control extends Thread {
 										serversList.add(c);
 										reconnect = true;
 										checkRemoteList = new HashMap<String, Integer>();
-
+										log.info("reconnect to the system");
 
 									} catch (IOException e) {
 										log.error("failed to make connection to "
@@ -862,7 +1066,7 @@ public class Control extends Thread {
 									serversList.add(c);
 									reconnect = true;
 									checkRemoteList = new HashMap<String, Integer>();
-	
+									log.info("reconnect to the system");
 	
 								} catch (IOException e) {
 									log.error("failed to make connection to "

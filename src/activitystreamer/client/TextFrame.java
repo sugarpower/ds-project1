@@ -5,6 +5,7 @@ import java.awt.Color;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.util.Date;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -104,6 +105,8 @@ public class TextFrame extends JFrame implements ActionListener {
 				outgoingObj.put("username", Settings.getUsername());
 				outgoingObj.put("command", "ACTIVITY_MESSAGE"); 
 				outgoingObj.put("activity", obj);
+				outgoingObj.put("timestamp", Long.toString(new Date().getTime()));/////
+				log.info("\n\nsuccess send\n");
 				
 				ClientSkeleton.getInstance().sendActivityObject(outgoingObj);
 			} catch (ParseException e1) {
@@ -113,6 +116,7 @@ public class TextFrame extends JFrame implements ActionListener {
 		} else if(e.getSource()==disconnectButton){
 			JSONObject outgoingObj = new JSONObject();
 			outgoingObj.put("command","LOGOUT");
+			outgoingObj.put("username",Settings.getUsername());/////
 			ClientSkeleton.getInstance().sendActivityObject(outgoingObj);
 			ClientSkeleton.getInstance().disconnect();
 		}

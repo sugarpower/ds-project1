@@ -8,6 +8,7 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.util.Date;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -64,9 +65,12 @@ public class ClientSkeleton extends Thread {
 			    	outcomingObj.put("secret", Settings.getSecret());
 			    	
 			    }else {
+			    	String timestamp=Long.toString(new Date().getTime());
 			    	outcomingObj.put("command", "LOGIN");
 			    	outcomingObj.put("username", Settings.getUsername());
 			    	outcomingObj.put("secret", Settings.getSecret());
+			    	outcomingObj.put("timestamp", timestamp);//////
+			    	
 			    }
 			    	outwriter.println(outcomingObj.toString());
 			    	outwriter.flush(); 
@@ -152,6 +156,21 @@ public class ClientSkeleton extends Thread {
 			if(command.equals("REGISTER_FAILED") || command.equals("LOGIN_FAILED") || command.equals("AUTHENTICATION_FAIL")) {
 				clientSolution.disconnect();
 				log.info(incomingObj.get("info").toString());
+			}
+			
+			/////
+			if(command.equals("ACTIVITY_BROADCAST")) {
+				JSONObject activityObj=(JSONObject)incomingObj.get("activity");
+				JSONObject outcomingObj=new JSONObject();
+				
+				String timestamp=(String) incomingObj.get("timestamp");
+				String username=(String) activityObj.get("authenticated_user");
+				outcomingObj.put("command", "ACTIVITY_REPLY");
+				outcomingObj.put("reciever", Settings.getUsername());
+				outcomingObj.put("sender",username);
+				outcomingObj.put("timestamp", timestamp);
+				outwriter.println(outcomingObj.toJSONString());
+				outwriter.flush(); 
 			}
 			
 		} catch (NullPointerException e) {
